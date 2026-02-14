@@ -21,7 +21,7 @@ DATASET_PATH = os.path.join(
     "municipal_complaints.csv"
 )
 
-MODEL_DIR = os.path.join(BASE_DIR, "saved_models")
+MODEL_DIR = os.path.join(BASE_DIR, "saved_models","Category")
 
 
 # ==============================
@@ -110,14 +110,6 @@ joblib.dump(
     model,
     os.path.join(MODEL_DIR, "category_model.pkl")
 )
-
-joblib.dump(
-    embedder,
-    os.path.join(MODEL_DIR, "transformer_embedder.pkl")
-)
-
-print("\nTransformer model saved successfully!")
-
 
 # ==============================
 # 7. Main Execution

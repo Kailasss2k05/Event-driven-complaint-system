@@ -115,7 +115,7 @@ SAVE_DIR = os.path.join(
     BASE_DIR,
     "..",
     "saved_models",
-    "priority"
+    "Priority"
 )
 
 os.makedirs(SAVE_DIR, exist_ok=True)
