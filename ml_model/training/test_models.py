@@ -22,10 +22,29 @@ priority_model = joblib.load(
     os.path.join(PRIORITY_DIR, "priority_model.pkl")
 )
 
-# Load transformer directly
-embedder = SentenceTransformer("all-MiniLM-L6-v2")
+# IMPORTANT: same model used in training
+embedder = SentenceTransformer("all-mpnet-base-v2")
+print("\nModels loaded successfully")
 
-print("\n Models loaded successfully")
+# ==============================
+# Safety Keywords
+# ==============================
+DANGER_WORDS = [
+    "electric", "shock", "fire",
+    "accident", "danger",
+    "collapse", "open manhole",
+    "sewage overflow", "gas leak"
+]
+
+def safety_priority_override(text, predicted_priority):
+    text = text.lower()
+
+    for word in DANGER_WORDS:
+        if word in text:
+            return "High"
+
+    return predicted_priority
+
 
 # ==============================
 # Testing Loop
@@ -37,10 +56,21 @@ while True:
     if text.lower() == "exit":
         break
 
-    emb = embedder.encode([text])
+    # ---- CATEGORY PREDICTION ----
+    emb_category = embedder.encode([text])
+    category = category_model.predict(emb_category)[0]
 
-    category = category_model.predict(emb)[0]
-    priority = priority_model.predict(emb)[0]
+    # ---- SEVERITY INPUT ----
+    severity = input("Enter Severity (Low/Medium/Critical): ")
+
+    # ---- PRIORITY PREDICTION ----
+    priority_input = text.lower() + " " + severity.lower()
+    emb_priority = embedder.encode([priority_input])
+
+    priority = priority_model.predict(emb_priority)[0]
+
+    # ---- SAFETY OVERRIDE ----
+    priority = safety_priority_override(text, priority)
 
     print("\nPrediction Result")
     print("-------------------")

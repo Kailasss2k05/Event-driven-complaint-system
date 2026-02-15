@@ -4,13 +4,14 @@ import joblib
 
 from sentence_transformers import SentenceTransformer
 from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report
 
 # ==============================
 # 1. Load Dataset
 # ==============================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
 DATA_PATH = os.path.join(
     BASE_DIR,
     "..",
@@ -25,7 +26,9 @@ df = pd.read_csv(DATA_PATH)
 # ==============================
 df.columns = df.columns.str.strip()
 
-df = df.dropna(subset=["Complaint_Description", "Priority"])
+df = df.dropna(
+    subset=["Complaint_Description", "Priority", "Severity"]
+)
 
 df["Complaint_Description"] = (
     df["Complaint_Description"]
@@ -34,18 +37,16 @@ df["Complaint_Description"] = (
     .str.strip()
 )
 
-# remove common noise words
-df["Complaint_Description"] = df["Complaint_Description"].str.replace(
-    r"\b(issue|problem|complaint)\b",
-    "",
-    regex=True
+# combine complaint text + severity
+df["model_text"] = (
+    df["Complaint_Description"] + " " + df["Severity"]
 )
 
-texts = df["Complaint_Description"]
+texts = df["model_text"]
 labels = df["Priority"]
 
 # ==============================
-# 3. Check Class Distribution
+# 3. Distribution Check
 # ==============================
 print("\nPriority Distribution:\n")
 print(labels.value_counts())
@@ -66,7 +67,7 @@ X_train, X_test, y_train, y_test = train_test_split(
 # ==============================
 print("\nLoading Sentence Transformer...")
 
-transformer = SentenceTransformer("all-MiniLM-L6-v2")
+transformer = SentenceTransformer("all-mpnet-base-v2")
 
 print("\nEncoding training data...")
 X_train_emb = transformer.encode(
@@ -81,11 +82,13 @@ X_test_emb = transformer.encode(
 )
 
 # ==============================
-# 6. Logistic Regression Model
+# 6. Random Forest Model
 # ==============================
-priority_model = LogisticRegression(
-    max_iter=1000,
-    class_weight="balanced"
+priority_model = RandomForestClassifier(
+    n_estimators=200,
+    max_depth=20,
+    class_weight="balanced",
+    random_state=42
 )
 
 priority_model.fit(X_train_emb, y_train)

@@ -66,7 +66,7 @@ X_train, X_test, y_train, y_test = train_test_split(
 # ==============================
 
 print("\nLoading transformer model...")
-embedder = SentenceTransformer("all-MiniLM-L6-v2")
+embedder = SentenceTransformer("all-mpnet-base-v2")
 
 print("Generating embeddings...")
 X_train_emb = embedder.encode(
