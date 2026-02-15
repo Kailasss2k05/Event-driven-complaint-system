@@ -7,9 +7,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, classification_report
 
-# ==============================
 # 1. Load Dataset
-# ==============================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 DATA_PATH = os.path.join(
@@ -21,9 +19,7 @@ DATA_PATH = os.path.join(
 
 df = pd.read_csv(DATA_PATH)
 
-# ==============================
 # 2. Cleaning
-# ==============================
 df.columns = df.columns.str.strip()
 
 df = df.dropna(
@@ -37,7 +33,6 @@ df["Complaint_Description"] = (
     .str.strip()
 )
 
-# combine complaint text + severity
 df["model_text"] = (
     df["Complaint_Description"] + " " + df["Severity"]
 )
@@ -45,15 +40,11 @@ df["model_text"] = (
 texts = df["model_text"]
 labels = df["Priority"]
 
-# ==============================
 # 3. Distribution Check
-# ==============================
 print("\nPriority Distribution:\n")
 print(labels.value_counts())
 
-# ==============================
 # 4. Train Test Split
-# ==============================
 X_train, X_test, y_train, y_test = train_test_split(
     texts,
     labels,
@@ -62,9 +53,7 @@ X_train, X_test, y_train, y_test = train_test_split(
     stratify=labels
 )
 
-# ==============================
 # 5. Sentence Transformer
-# ==============================
 print("\nLoading Sentence Transformer...")
 
 transformer = SentenceTransformer("all-mpnet-base-v2")
@@ -81,9 +70,7 @@ X_test_emb = transformer.encode(
     show_progress_bar=True
 )
 
-# ==============================
 # 6. Random Forest Model
-# ==============================
 priority_model = RandomForestClassifier(
     n_estimators=200,
     max_depth=20,
@@ -93,9 +80,7 @@ priority_model = RandomForestClassifier(
 
 priority_model.fit(X_train_emb, y_train)
 
-# ==============================
 # 7. Evaluation
-# ==============================
 y_pred = priority_model.predict(X_test_emb)
 
 print("\n==============================")
@@ -111,9 +96,7 @@ print("Test Accuracy  :",
 print("\nClassification Report:\n")
 print(classification_report(y_test, y_pred))
 
-# ==============================
 # 8. Save Model
-# ==============================
 SAVE_DIR = os.path.join(
     BASE_DIR,
     "..",

@@ -8,10 +8,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, accuracy_score
 
-
-# ==============================
-# 0. Project Paths (IMPORTANT)
-# ==============================
+# 0. Project Paths
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -24,9 +21,7 @@ DATASET_PATH = os.path.join(
 MODEL_DIR = os.path.join(BASE_DIR, "saved_models","Category")
 
 
-# ==============================
 # 1. Load Dataset
-# ==============================
 
 df = pd.read_csv(DATASET_PATH)
 
@@ -48,9 +43,7 @@ X = df["complaint_description"]
 y = df["category"]
 
 
-# ==============================
 # 2. Train Test Split
-# ==============================
 
 X_train, X_test, y_train, y_test = train_test_split(
     X,
@@ -60,10 +53,7 @@ X_train, X_test, y_train, y_test = train_test_split(
     stratify=y
 )
 
-
-# ==============================
 # 3. Load Transformer Model
-# ==============================
 
 print("\nLoading transformer model...")
 embedder = SentenceTransformer("all-mpnet-base-v2")
@@ -80,18 +70,13 @@ X_test_emb = embedder.encode(
 )
 
 
-# ==============================
 # 4. Train Classifier
-# ==============================
 
 print("\nTraining classifier...")
 model = LogisticRegression(max_iter=1000)
 model.fit(X_train_emb, y_train)
 
-
-# ==============================
 # 5. Evaluation
-# ==============================
 
 y_pred = model.predict(X_test_emb)
 
@@ -99,10 +84,7 @@ print("\nAccuracy:", accuracy_score(y_test, y_pred))
 print("\nClassification Report:\n")
 print(classification_report(y_test, y_pred))
 
-
-# ==============================
 # 6. Save Model
-# ==============================
 
 os.makedirs(MODEL_DIR, exist_ok=True)
 
@@ -111,9 +93,7 @@ joblib.dump(
     os.path.join(MODEL_DIR, "category_model.pkl")
 )
 
-# ==============================
 # 7. Main Execution
-# ==============================
 
 if __name__ == "__main__":
     print("\nTraining completed successfully!")
