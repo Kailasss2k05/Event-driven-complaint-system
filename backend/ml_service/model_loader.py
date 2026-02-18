@@ -105,6 +105,11 @@ DEPARTMENT_MAP = {
 # Prediction Function
 # ==============================
 def predict_complaint(text: str):
+    
+    global models_ready
+
+    if not models_ready:
+        load_models()
 
     emb = embedder.encode([text], convert_to_numpy=True)
 
