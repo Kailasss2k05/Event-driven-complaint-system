@@ -88,8 +88,13 @@ print(classification_report(y_test, y_pred))
 
 os.makedirs(MODEL_DIR, exist_ok=True)
 
+model_package = {
+    "model": model,
+    "embedder": "all-mpnet-base-v2"
+}
+
 joblib.dump(
-    model,
+    model_package,
     os.path.join(MODEL_DIR, "category_model.pkl")
 )
 

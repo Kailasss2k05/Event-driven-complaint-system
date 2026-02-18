@@ -106,8 +106,13 @@ SAVE_DIR = os.path.join(
 
 os.makedirs(SAVE_DIR, exist_ok=True)
 
+model_package = {
+    "model": priority_model,
+    "embedder": "all-mpnet-base-v2"
+}
+
 joblib.dump(
-    priority_model,
+    model_package,
     os.path.join(SAVE_DIR, "priority_model.pkl")
 )
 
