@@ -3,8 +3,7 @@ from pydantic import BaseModel
 import threading
 import time
 
-import model_loader
-
+from . import model_loader
 app = FastAPI()
 
 

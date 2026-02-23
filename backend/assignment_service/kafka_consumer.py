@@ -27,7 +27,7 @@ try:
         print(f"Assigned to: {department}")
 
 except KeyboardInterrupt:
-    print("\nStopping Assignment Service gracefully...")
+    print("\nStopping Assignment Service...")
 
 finally:
     consumer.close()
