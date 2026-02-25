@@ -1,10 +1,25 @@
-from fastapi import FastAPI
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-import threading
-import time
 
 from . import model_loader
-app = FastAPI()
+
+
+# ==============================
+# Lifespan (replaces deprecated on_event)
+# ==============================
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    model_loader.load_models()
+    yield
+    # Shutdown (cleanup if needed)
+
+app = FastAPI(
+    title="ML Service",
+    version="1.0.0",
+    lifespan=lifespan
+)
 
 
 # ==============================
@@ -13,13 +28,6 @@ app = FastAPI()
 class Complaint(BaseModel):
     complaint: str
 
-
-# ==============================
-# Startup Event
-# ==============================
-@app.on_event("startup")
-def startup_event():
-    model_loader.load_models()
 
 # ==============================
 # Health Check
@@ -38,6 +46,15 @@ def home():
 def predict(data: Complaint):
 
     if not model_loader.models_ready:
-        return {"status": "Model loading, try again in a few seconds"}
+        raise HTTPException(
+            status_code=503,
+            detail="Model loading, try again in a few seconds"
+        )
 
-    return model_loader.predict_complaint(data.complaint)
+    try:
+        return model_loader.predict_complaint(data.complaint)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Prediction failed: {str(e)}"
+        )

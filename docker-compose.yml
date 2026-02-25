@@ -23,3 +23,13 @@ services:
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
 
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  kafka-init:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka-init
+    depends_on:
+      - kafka
+    volumes:
+      - ./kafka/create-topics.sh:/create-topics.sh
+    entrypoint: ["/bin/bash", "/create-topics.sh"]
+    restart: "no"

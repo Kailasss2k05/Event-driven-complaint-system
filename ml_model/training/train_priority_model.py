@@ -116,4 +116,8 @@ joblib.dump(
     os.path.join(SAVE_DIR, "priority_model.pkl")
 )
 
-print("\nPriority model saved successfully!")
+# Save embedding name to text file
+with open(os.path.join(SAVE_DIR, "embedding.txt"), "w") as f:
+    f.write("all-mpnet-base-v2")
+
+print("\nPriority model and embedding info saved!")

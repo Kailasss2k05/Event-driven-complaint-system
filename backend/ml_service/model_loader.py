@@ -1,6 +1,9 @@
 import os
 import joblib
+from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
+
+load_dotenv()
 
 # ==============================
 # Global Variables
@@ -53,6 +56,18 @@ def load_models():
         "embedding.txt"
     )
 
+    # Validate that model files exist
+    for path, name in [
+        (category_path, "Category model"),
+        (priority_path, "Priority model"),
+        (embedding_path, "Embedding config")
+    ]:
+        if not os.path.exists(path):
+            raise FileNotFoundError(
+                f"{name} not found at {path}. "
+                "Run the training scripts first."
+            )
+
     # Load model packages
     category_package = joblib.load(category_path)
     priority_package = joblib.load(priority_path)
@@ -64,7 +79,10 @@ def load_models():
     with open(embedding_path, "r") as f:
         embedder_name = f.read().strip()
 
-    embedder = SentenceTransformer(embedder_name, device="cpu")
+    embedder = SentenceTransformer(
+        embedder_name,
+        device=os.getenv("MODEL_DEVICE")
+    )
 
     # Warmup (removes first prediction delay)
     embedder.encode(["warmup"])
@@ -102,6 +120,40 @@ DEPARTMENT_MAP = {
 }
 
 # ==============================
+# Severity Detection
+# ==============================
+CRITICAL_WORDS = [
+    "fire", "electric", "shock",
+    "accident", "collapse",
+    "open manhole", "gas leak"
+]
+
+MEDIUM_WORDS = [
+    "leakage", "sewage",
+    "damaged road", "overflow"
+]
+
+
+def detect_severity(text: str) -> str:
+    text_lower = text.lower()
+    for word in CRITICAL_WORDS:
+        if word in text_lower:
+            return "Critical"
+    for word in MEDIUM_WORDS:
+        if word in text_lower:
+            return "Medium"
+    return "Low"
+
+
+def safety_priority_override(text: str, predicted_priority: str) -> str:
+    text_lower = text.lower()
+    for word in CRITICAL_WORDS:
+        if word in text_lower:
+            return "High"
+    return predicted_priority
+
+
+# ==============================
 # Prediction Function
 # ==============================
 def predict_complaint(text: str):
@@ -111,10 +163,16 @@ def predict_complaint(text: str):
     if not models_ready:
         load_models()
 
-    emb = embedder.encode([text], convert_to_numpy=True)
+    # Category prediction uses raw text
+    emb_category = embedder.encode([text], convert_to_numpy=True)
+    category = category_model.predict(emb_category)[0]
 
-    category = category_model.predict(emb)[0]
-    priority = priority_model.predict(emb)[0]
+    # Priority prediction uses text + severity (matches training data format)
+    severity = detect_severity(text)
+    priority_input = text.lower() + " " + severity
+    emb_priority = embedder.encode([priority_input], convert_to_numpy=True)
+    priority = priority_model.predict(emb_priority)[0]
+    priority = safety_priority_override(text, priority)
 
     department = DEPARTMENT_MAP.get(category, "General Department")
 

@@ -98,6 +98,12 @@ joblib.dump(
     os.path.join(MODEL_DIR, "category_model.pkl")
 )
 
+# Save embedding name to text file
+with open(os.path.join(MODEL_DIR, "embedding.txt"), "w") as f:
+    f.write("all-mpnet-base-v2")
+
+print("\nCategory model and embedding info saved!")
+
 # 7. Main Execution
 
 if __name__ == "__main__":
