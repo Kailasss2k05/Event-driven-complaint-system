@@ -65,11 +65,7 @@ def process_event(event, producer):
     producer.flush()
     print(f"Assignment event published to {TOPIC_ASSIGNED}")
 
-    # Log event to audit trail
-    try:
-        insert_event(complaint_id, "complaint-assigned", assigned_event, "ASSIGNED")
-    except Exception as e:
-        print(f"Warning: Failed to log event: {e}")
+    # Note: Audit service will log this event from Kafka
 
 
 def main():
