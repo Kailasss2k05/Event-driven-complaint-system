@@ -23,18 +23,22 @@ def get_connection():
 # Complaint Operations
 # ==============================
 
-def insert_complaint(complaint_id, description, user_id, status="SUBMITTED"):
+def insert_complaint(complaint_id, description, user_id, status="SUBMITTED",
+                     translated_description=None, summary=None, original_language="en"):
     """Insert a new complaint into the database."""
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(
                 """
-                INSERT INTO complaints (complaint_id, description, user_id, status)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO complaints
+                    (complaint_id, description, translated_description, summary,
+                     original_language, user_id, status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 RETURNING complaint_id, status, created_at
                 """,
-                (complaint_id, description, user_id, status)
+                (complaint_id, description, translated_description, summary,
+                 original_language, user_id, status)
             )
             result = cur.fetchone()
             conn.commit()
@@ -78,7 +82,7 @@ def update_complaint_categorized(complaint_id, category, priority, severity, dep
 
 
 def update_complaint_assigned(complaint_id, assigned_to):
-    """Update complaint after department assignment."""
+    """Update complaint after initial department assignment."""
     conn = get_connection()
     try:
         with conn.cursor() as cur:
@@ -104,21 +108,62 @@ def update_complaint_assigned(complaint_id, assigned_to):
         conn.close()
 
 
-def update_complaint_status(complaint_id, status):
-    """Update complaint status."""
+def update_complaint_rerouted(complaint_id, to_department):
+    """Re-route complaint to a different department — resets assigned_to and status to ASSIGNED."""
     conn = get_connection()
     try:
         with conn.cursor() as cur:
             cur.execute(
                 """
                 UPDATE complaints
-                SET status = %s,
+                SET department = %s,
+                    assigned_to = NULL,
+                    status = 'ASSIGNED',
                     updated_at = NOW()
                 WHERE complaint_id = %s
-                RETURNING complaint_id, status, updated_at
+                RETURNING complaint_id, department, status
                 """,
-                (status, complaint_id)
+                (to_department, complaint_id)
             )
+            result = cur.fetchone()
+            conn.commit()
+            return result
+    except Exception as e:
+        conn.rollback()
+        print(f"Failed to re-route complaint: {e}")
+        raise
+    finally:
+        conn.close()
+
+
+def update_complaint_status(complaint_id, status, rejection_reason=None):
+    """Update complaint status with optional rejection reason."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            if rejection_reason:
+                cur.execute(
+                    """
+                    UPDATE complaints
+                    SET status = %s,
+                        rejection_reason = %s,
+                        updated_at = NOW()
+                    WHERE complaint_id = %s
+                    RETURNING complaint_id, status, updated_at
+                    """,
+                    (status, rejection_reason, complaint_id)
+                )
+            else:
+                cur.execute(
+                    """
+                    UPDATE complaints
+                    SET status = %s,
+                        updated_at = NOW()
+                    WHERE complaint_id = %s
+                    RETURNING complaint_id, status, updated_at
+                    """,
+                    (status, complaint_id)
+                )
             result = cur.fetchone()
             conn.commit()
             return result
@@ -140,36 +185,6 @@ def get_complaint(complaint_id):
                 (complaint_id,)
             )
             return cur.fetchone()
-    finally:
-        conn.close()
-
-
-# Alias for backward compatibility
-get_complaint_by_id = get_complaint
-
-
-def generate_complaint_id():
-    """Generate sequential complaint ID in format AA01, AA02, etc."""
-    conn = get_connection()
-    try:
-        with conn.cursor() as cur:
-            # Get the highest existing complaint ID number
-            cur.execute(
-                "SELECT complaint_id FROM complaints WHERE complaint_id LIKE 'AA%' ORDER BY CAST(SUBSTRING(complaint_id, 3) AS INTEGER) DESC LIMIT 1"
-            )
-            result = cur.fetchone()
-            
-            if result:
-                # Extract the number part and increment
-                last_id = result['complaint_id']
-                number_part = int(last_id[2:])  # Remove 'AA' prefix
-                new_number = number_part + 1
-            else:
-                # First complaint
-                new_number = 1
-            
-            # Format with zero padding (AA001, AA002, etc. - 3 digits for better readability)
-            return f"AA{new_number:03d}"
     finally:
         conn.close()
 
@@ -201,6 +216,50 @@ def get_complaints_by_user(user_id):
                 (user_id,)
             )
             return cur.fetchall()
+    finally:
+        conn.close()
+
+
+def get_recent_complaints_by_user(user_id, minutes=5):
+    """Get recent complaints by user within specified time window (for duplicate detection)."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT complaint_id, description, created_at
+                FROM complaints 
+                WHERE user_id = %s 
+                  AND created_at >= NOW() - INTERVAL '%s minutes'
+                ORDER BY created_at DESC
+                """,
+                (user_id, minutes)
+            )
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
+# Alias for backward compatibility
+get_complaint_by_id = get_complaint
+
+
+def generate_complaint_id():
+    """Generate sequential complaint ID in format AA001, AA002, etc."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT complaint_id FROM complaints WHERE complaint_id LIKE 'AA%' ORDER BY CAST(SUBSTRING(complaint_id, 3) AS INTEGER) DESC LIMIT 1"
+            )
+            result = cur.fetchone()
+            if result:
+                last_id = result["complaint_id"]
+                number_part = int(last_id[2:])
+                new_number = number_part + 1
+            else:
+                new_number = 1
+            return f"AA{new_number:03d}"
     finally:
         conn.close()
 
@@ -389,6 +448,16 @@ def can_access_complaint(user, complaint_id):
         return complaint and complaint["department"] == user["department_name"]
     
     return False
+
+
+def get_accessible_complaints(user):
+    """Get complaints accessible to a user based on their role."""
+    if user["role"] == "super_admin":
+        return get_all_complaints()
+    elif user["role"] == "department_admin" and user["department_name"]:
+        return get_complaints_by_department(user["department_name"])
+    else:  # regular user
+        return get_complaints_by_user(user["id"])
 
 
 def require_role(*allowed_roles):

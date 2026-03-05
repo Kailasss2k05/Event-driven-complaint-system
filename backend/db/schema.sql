@@ -22,18 +22,27 @@ CREATE TABLE IF NOT EXISTS categories (
 
 -- 3. Complaints Table
 CREATE TABLE IF NOT EXISTS complaints (
-    complaint_id    VARCHAR(20) PRIMARY KEY,
-    user_id         INT REFERENCES users(id) ON DELETE CASCADE,
-    description     TEXT NOT NULL,
-    category        VARCHAR(100),
-    priority        VARCHAR(20),
-    severity        VARCHAR(20),
-    department      VARCHAR(100),
-    status          VARCHAR(30) DEFAULT 'SUBMITTED',
-    assigned_to     VARCHAR(100),
-    created_at      TIMESTAMP DEFAULT NOW(),
-    updated_at      TIMESTAMP DEFAULT NOW()
+    complaint_id            VARCHAR(20) PRIMARY KEY,
+    user_id                 INT REFERENCES users(id) ON DELETE CASCADE,
+    description             TEXT NOT NULL,
+    translated_description  TEXT,
+    summary                 TEXT,
+    original_language       VARCHAR(10) DEFAULT 'en',
+    category                VARCHAR(100),
+    priority                VARCHAR(20),
+    severity                VARCHAR(20),
+    department              VARCHAR(100),
+    status                  VARCHAR(30) DEFAULT 'SUBMITTED',
+    rejection_reason        TEXT,
+    assigned_to             VARCHAR(100),
+    created_at              TIMESTAMP DEFAULT NOW(),
+    updated_at              TIMESTAMP DEFAULT NOW()
 );
+
+-- Migration (run if table already exists):
+-- ALTER TABLE complaints ADD COLUMN IF NOT EXISTS translated_description TEXT;
+-- ALTER TABLE complaints ADD COLUMN IF NOT EXISTS summary TEXT;
+-- ALTER TABLE complaints ADD COLUMN IF NOT EXISTS original_language VARCHAR(10) DEFAULT 'en';
 
 -- 4. Complaint Events (Audit Trail)
 CREATE TABLE IF NOT EXISTS complaint_events (

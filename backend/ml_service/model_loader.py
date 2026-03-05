@@ -1,4 +1,5 @@
 import os
+import re
 import joblib
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
@@ -89,6 +90,93 @@ def load_models():
 
     models_ready = True
     print("Models loaded successfully!")
+
+
+# ==============================
+# Language Detection & Translation
+# ==============================
+def translate_to_english(text: str) -> dict:
+    """
+    Detect language of text and translate to English if needed.
+    Returns dict with: original, translated, language, was_translated
+    """
+    try:
+        from langdetect import detect, LangDetectException
+        try:
+            lang = detect(text)
+        except LangDetectException:
+            lang = "en"
+
+        if lang == "en":
+            return {
+                "original": text,
+                "translated": text,
+                "language": "en",
+                "was_translated": False
+            }
+
+        from deep_translator import GoogleTranslator
+        translated = GoogleTranslator(source="auto", target="en").translate(text)
+        return {
+            "original": text,
+            "translated": translated,
+            "language": lang,
+            "was_translated": True
+        }
+    except Exception as e:
+        # Fallback: treat as English if translation fails
+        print(f"Translation failed: {e}")
+        return {
+            "original": text,
+            "translated": text,
+            "language": "en",
+            "was_translated": False
+        }
+
+
+# ==============================
+# Extractive Summarization
+# ==============================
+def summarize_text(text: str, max_sentences: int = 2) -> str:
+    """
+    Extractive summarization using word frequency scoring.
+    Returns a 1-2 sentence summary of the complaint.
+    """
+    # Split into sentences
+    sentence_pattern = re.compile(r'(?<=[.!?])\s+')
+    sentences = [s.strip() for s in sentence_pattern.split(text.strip()) if len(s.strip()) > 10]
+
+    if len(sentences) <= max_sentences:
+        return text.strip()
+
+    # Stopwords (common words that don't add meaning)
+    stopwords = {
+        "the", "a", "an", "is", "it", "in", "on", "at", "to", "for",
+        "of", "and", "or", "but", "not", "with", "this", "that", "was",
+        "are", "be", "has", "have", "had", "by", "as", "from", "there",
+        "which", "who", "i", "we", "my", "our", "your", "their", "its"
+    }
+
+    # Word frequency
+    words = re.findall(r'\b[a-z]+\b', text.lower())
+    freq = {}
+    for w in words:
+        if w not in stopwords:
+            freq[w] = freq.get(w, 0) + 1
+
+    # Score each sentence
+    scores = []
+    for s in sentences:
+        s_words = re.findall(r'\b[a-z]+\b', s.lower())
+        score = sum(freq.get(w, 0) for w in s_words if w not in stopwords)
+        scores.append((score, s))
+
+    # Pick top sentences in original order
+    top = sorted(scores, key=lambda x: x[0], reverse=True)[:max_sentences]
+    top_sentences = [s for _, s in top]
+    # Return in original document order
+    result = " ".join(s for s in sentences if s in top_sentences)
+    return result.strip()
 
 DEPARTMENT_MAP = {
 

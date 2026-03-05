@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
+from typing import Optional
 
 from . import model_loader
 
@@ -27,6 +28,13 @@ app = FastAPI(
 # ==============================
 class Complaint(BaseModel):
     complaint: str
+
+class TranslateRequest(BaseModel):
+    text: str
+
+class SummarizeRequest(BaseModel):
+    text: str
+    max_sentences: Optional[int] = 2
 
 
 # ==============================
@@ -58,3 +66,33 @@ def predict(data: Complaint):
             status_code=500,
             detail=f"Prediction failed: {str(e)}"
         )
+
+
+# ==============================
+# Translation Endpoint
+# ==============================
+@app.post("/translate")
+def translate(data: TranslateRequest):
+    """Detect language and translate complaint text to English."""
+    try:
+        result = model_loader.translate_to_english(data.text)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Translation failed: {str(e)}")
+
+
+# ==============================
+# Summarization Endpoint
+# ==============================
+@app.post("/summarize")
+def summarize(data: SummarizeRequest):
+    """Generate an extractive summary of the complaint text."""
+    try:
+        summary = model_loader.summarize_text(data.text, data.max_sentences)
+        return {
+            "summary": summary,
+            "original_length": len(data.text),
+            "summary_length": len(summary)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Summarization failed: {str(e)}")

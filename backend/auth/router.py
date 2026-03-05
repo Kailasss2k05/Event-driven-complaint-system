@@ -28,7 +28,10 @@ async def signup(user: UserCreate):
         )
     
     # Hash password and create user
-    hashed_password = hash_password(user.password)
+    try:
+        hashed_password = hash_password(user.password)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     user_id = database.create_user(
         user.username, 
         user.email, 

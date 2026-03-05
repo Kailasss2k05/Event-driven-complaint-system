@@ -9,7 +9,9 @@ KAFKA_BROKER = os.getenv("KAFKA_BROKER")
 
 # Pipeline Topics
 TOPIC_SUBMITTED = os.getenv("TOPIC_COMPLAINT_SUBMITTED")
+TOPIC_VALIDATED = os.getenv("TOPIC_COMPLAINT_VALIDATED")
 TOPIC_CATEGORIZED = os.getenv("TOPIC_COMPLAINT_CATEGORIZED")
+TOPIC_ASSIGNED = os.getenv("TOPIC_COMPLAINT_ASSIGNED")
 TOPIC_STATUS_UPDATED = os.getenv("TOPIC_COMPLAINT_STATUS_UPDATED")
 
 producer = None
@@ -53,11 +55,26 @@ def send_complaint_submitted(event):
     send_event(TOPIC_SUBMITTED, event)
 
 
+def send_complaint_validated(event):
+    """Publish after complaint passes validation."""
+    send_event(TOPIC_VALIDATED, event)
+
+
 def send_complaint_categorized(event):
     """Publish after ML categorization."""
     send_event(TOPIC_CATEGORIZED, event)
 
 
-def send_status_update(event):
+def send_complaint_assigned(event):
+    """Publish when a complaint is assigned."""
+    send_event(TOPIC_ASSIGNED, event)
+
+
+def send_complaint_status_updated(event):
     """Publish when complaint status changes."""
+    send_event(TOPIC_STATUS_UPDATED, event)
+
+
+def send_status_update(event):
+    """Publish when complaint status changes (legacy function)."""
     send_event(TOPIC_STATUS_UPDATED, event)

@@ -20,3 +20,6 @@ Thumbs.db
 
 # Cache
 .cache/
+
+# Validation rules (contains encoded profanity/spam lists)
+backend/validation_service/validation_rules.json
