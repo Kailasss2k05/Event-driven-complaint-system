@@ -24,7 +24,8 @@ def get_connection():
 # ==============================
 
 def insert_complaint(complaint_id, description, user_id, status="SUBMITTED",
-                     translated_description=None, summary=None, original_language="en"):
+                     translated_description=None, summary=None, original_language="en",
+                     image_url=None):
     """Insert a new complaint into the database."""
     conn = get_connection()
     try:
@@ -33,12 +34,12 @@ def insert_complaint(complaint_id, description, user_id, status="SUBMITTED",
                 """
                 INSERT INTO complaints
                     (complaint_id, description, translated_description, summary,
-                     original_language, user_id, status)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                     original_language, user_id, status, image_url)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING complaint_id, status, created_at
                 """,
                 (complaint_id, description, translated_description, summary,
-                 original_language, user_id, status)
+                 original_language, user_id, status, image_url)
             )
             result = cur.fetchone()
             conn.commit()

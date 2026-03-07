@@ -99,6 +99,8 @@ async def process_event(message, email_service, websocket_manager, notification_
         # Process based on topic
         if topic == os.getenv("TOPIC_COMPLAINT_SUBMITTED"):
             await handle_complaint_submitted(event_data, user, email_service, websocket_manager, notification_store)
+        elif topic == os.getenv("TOPIC_COMPLAINT_CATEGORIZED"):
+            await handle_complaint_categorized(event_data, user, complaint, email_service, websocket_manager, notification_store)
         elif topic == os.getenv("TOPIC_COMPLAINT_ASSIGNED"):
             await handle_complaint_assigned(event_data, user, complaint, email_service, websocket_manager, notification_store)
         elif topic == os.getenv("TOPIC_COMPLAINT_STATUS_UPDATED"):

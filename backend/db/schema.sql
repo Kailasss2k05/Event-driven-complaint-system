@@ -12,7 +12,20 @@ CREATE TABLE IF NOT EXISTS departments (
     created_at      TIMESTAMP DEFAULT NOW()
 );
 
--- 2. Categories Table
+-- 2. Users Table (must come before complaints, which references users.id)
+CREATE TABLE IF NOT EXISTS users (
+    id              SERIAL PRIMARY KEY,
+    username        VARCHAR(100) UNIQUE NOT NULL,
+    email           VARCHAR(255) UNIQUE NOT NULL,
+    password_hash   TEXT NOT NULL,
+    role            VARCHAR(50) DEFAULT 'user' CHECK (role IN ('user', 'department_admin', 'super_admin')),
+    department_name VARCHAR(255) REFERENCES departments(name),
+    is_active       BOOLEAN DEFAULT TRUE,
+    created_at      TIMESTAMP DEFAULT NOW(),
+    updated_at      TIMESTAMP DEFAULT NOW()
+);
+
+-- 3. Categories Table
 CREATE TABLE IF NOT EXISTS categories (
     category_id     SERIAL PRIMARY KEY,
     name            VARCHAR(100) UNIQUE NOT NULL,
@@ -20,7 +33,7 @@ CREATE TABLE IF NOT EXISTS categories (
     created_at      TIMESTAMP DEFAULT NOW()
 );
 
--- 3. Complaints Table
+-- 4. Complaints Table
 CREATE TABLE IF NOT EXISTS complaints (
     complaint_id            VARCHAR(20) PRIMARY KEY,
     user_id                 INT REFERENCES users(id) ON DELETE CASCADE,
@@ -35,6 +48,7 @@ CREATE TABLE IF NOT EXISTS complaints (
     status                  VARCHAR(30) DEFAULT 'SUBMITTED',
     rejection_reason        TEXT,
     assigned_to             VARCHAR(100),
+    image_url               VARCHAR(500),
     created_at              TIMESTAMP DEFAULT NOW(),
     updated_at              TIMESTAMP DEFAULT NOW()
 );
@@ -43,8 +57,9 @@ CREATE TABLE IF NOT EXISTS complaints (
 -- ALTER TABLE complaints ADD COLUMN IF NOT EXISTS translated_description TEXT;
 -- ALTER TABLE complaints ADD COLUMN IF NOT EXISTS summary TEXT;
 -- ALTER TABLE complaints ADD COLUMN IF NOT EXISTS original_language VARCHAR(10) DEFAULT 'en';
+-- ALTER TABLE complaints ADD COLUMN IF NOT EXISTS image_url VARCHAR(500);
 
--- 4. Complaint Events (Audit Trail)
+-- 5. Complaint Events (Audit Trail)
 CREATE TABLE IF NOT EXISTS complaint_events (
     event_id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     complaint_id    VARCHAR(20) REFERENCES complaints(complaint_id),
@@ -52,19 +67,6 @@ CREATE TABLE IF NOT EXISTS complaint_events (
     event_data      JSONB NOT NULL,
     status          VARCHAR(30) NOT NULL,
     created_at      TIMESTAMP DEFAULT NOW()
-);
-
--- 5. Users Table (Authentication)
-CREATE TABLE IF NOT EXISTS users (
-    id              SERIAL PRIMARY KEY,
-    username        VARCHAR(100) UNIQUE NOT NULL,
-    email           VARCHAR(255) UNIQUE NOT NULL,
-    password_hash   TEXT NOT NULL,
-    role            VARCHAR(50) DEFAULT 'user' CHECK (role IN ('user', 'department_admin', 'super_admin')),
-    department_name VARCHAR(255) REFERENCES departments(name),
-    is_active       BOOLEAN DEFAULT TRUE,
-    created_at      TIMESTAMP DEFAULT NOW(),
-    updated_at      TIMESTAMP DEFAULT NOW()
 );
 
 -- ==============================

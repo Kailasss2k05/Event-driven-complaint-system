@@ -48,6 +48,28 @@ Best regards,
 Municipal Complaint System
                 """
             },
+            "complaint_categorized": {
+                "subject": "Complaint Categorized - #{complaint_id}",
+                "body": """
+Dear {user_name},
+
+Your complaint has been reviewed and categorized by our system.
+
+--------------------------------------------------
+Complaint ID   : {complaint_id}
+Category       : {category}
+Priority       : {priority}
+Department     : {department}
+--------------------------------------------------
+
+Your complaint has been routed to the appropriate department and will
+be assigned to an officer shortly. You will receive a notification
+once it has been assigned.
+
+Best regards,
+Municipal Complaint System
+                """
+            },
             "complaint_assigned": {
                 "subject": "Complaint Assigned - #{complaint_id}",
                 "body": """

@@ -9,7 +9,7 @@ load_dotenv()
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from backend.db.database import update_complaint_assigned, insert_event
+from backend.db.database import update_complaint_assigned
 
 KAFKA_BROKER = os.getenv("KAFKA_BROKER")
 TOPIC_CATEGORIZED = os.getenv("TOPIC_COMPLAINT_CATEGORIZED")

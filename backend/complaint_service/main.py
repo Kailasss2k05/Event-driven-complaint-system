@@ -2,10 +2,13 @@ import os
 import json
 import base64
 import httpx
+import cloudinary
+import cloudinary.uploader
 from datetime import datetime, timezone
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
 from pydantic import BaseModel
+from typing import Optional
 
 from backend.complaint_service.kafka_producer import (
     send_complaint_submitted,
@@ -30,13 +33,29 @@ from backend.db.database import (
     update_complaint_assigned,
     update_complaint_rerouted
 )
+from fastapi.middleware.cors import CORSMiddleware
 from backend.auth.router import router as auth_router
 
 load_dotenv()
 
 app = FastAPI(title="Complaint Service", version="1.0.0")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 ML_SERVICE_URL = os.getenv("ML_SERVICE_URL")
+
+cloudinary.config(
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET"),
+    secure=True
+)
 
 
 # ===============================
@@ -115,6 +134,7 @@ def _run_content_validation(description: str, user_id: int) -> tuple[bool, str]:
 # ===============================
 class ComplaintRequest(BaseModel):
     description: str
+    image_url: Optional[str] = None
 
 
 class ComplaintAssignmentRequest(BaseModel):
@@ -133,6 +153,31 @@ class ComplaintStatusUpdateRequest(BaseModel):
 # ===============================
 # Include auth endpoints: POST /auth/token, GET /auth/me
 app.include_router(auth_router)
+
+
+@app.post("/complaint/upload-image", tags=["Complaints"])
+async def upload_complaint_image(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
+    """Upload an image for a complaint. Returns the image URL to include when submitting."""
+    allowed_types = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Only JPG, PNG, and WebP images are allowed")
+
+    contents = await file.read()
+    if len(contents) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Image must be under 5 MB")
+
+    try:
+        result = cloudinary.uploader.upload(
+            contents,
+            folder="complaint_images",
+            resource_type="image"
+        )
+        return {"image_url": result["secure_url"]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Image upload failed: {str(e)}")
 
 
 # ===============================
@@ -201,7 +246,8 @@ async def create_complaint(
             complaint_id, text, user_id, status="SUBMITTED",
             translated_description=translated_text if was_translated else None,
             summary=summary,
-            original_language=original_language
+            original_language=original_language,
+            image_url=complaint.image_url
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save complaint: {str(e)}")

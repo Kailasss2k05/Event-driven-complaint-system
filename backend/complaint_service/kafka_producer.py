@@ -73,8 +73,3 @@ def send_complaint_assigned(event):
 def send_complaint_status_updated(event):
     """Publish when complaint status changes."""
     send_event(TOPIC_STATUS_UPDATED, event)
-
-
-def send_status_update(event):
-    """Publish when complaint status changes (legacy function)."""
-    send_event(TOPIC_STATUS_UPDATED, event)

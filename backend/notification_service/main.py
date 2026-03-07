@@ -109,6 +109,34 @@ async def mark_notification_read(notification_id: str, current_user: dict = Depe
     notification_store.mark_as_read(notification_id, current_user["id"])
     return {"message": "Notification marked as read"}
 
+
+@app.put("/notifications/{user_id}/mark-all-read")
+async def mark_all_notifications_read(user_id: int, current_user: dict = Depends(get_current_user)):
+    """Mark all notifications as read for a user."""
+    if current_user["id"] != user_id and current_user["role"] not in ["department_admin", "super_admin"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    count = notification_store.mark_all_as_read(user_id)
+    return {"message": f"Marked {count} notifications as read"}
+
+
+@app.get("/notifications/{user_id}/unread-count")
+async def get_unread_count(user_id: int, current_user: dict = Depends(get_current_user)):
+    """Get unread notification count for a user."""
+    if current_user["id"] != user_id and current_user["role"] not in ["department_admin", "super_admin"]:
+        raise HTTPException(status_code=403, detail="Access denied")
+    count = notification_store.get_unread_count(user_id)
+    return {"unread_count": count}
+
+
+@app.delete("/notifications/{notification_id}")
+async def delete_notification(notification_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a notification."""
+    deleted = notification_store.delete_notification(notification_id, current_user["id"])
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Notification not found or access denied")
+    return {"message": "Notification deleted"}
+
+
 @app.post("/preferences")
 async def update_notification_preferences(preferences: NotificationPreferences, current_user: dict = Depends(get_current_user)):
     """Update user notification preferences."""
