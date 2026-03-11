@@ -67,6 +67,8 @@ export const AdminDashboard = () => {
         total: complaints.length,
         pending: complaints.filter(c => !['RESOLVED', 'CLOSED', 'DUMPED'].includes(c.status)).length,
         resolved: complaints.filter(c => c.status === 'RESOLVED').length,
+        closed: complaints.filter(c => c.status === 'CLOSED').length,
+        dumped: complaints.filter(c => c.status === 'DUMPED').length,
         departments: departments.length,
     }), [complaints, departments]);
 
@@ -159,20 +161,22 @@ export const AdminDashboard = () => {
             )}
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-5">
                 {[
-                    { label: 'Total Complaints', value: stats.total, icon: FileText, color: 'text-blue-600', bg: 'bg-blue-100' },
-                    { label: 'Active / Pending', value: stats.pending, icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-100' },
+                    { label: 'Total', value: stats.total, icon: FileText, color: 'text-blue-600', bg: 'bg-blue-100' },
+                    { label: 'Active', value: stats.pending, icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-100' },
                     { label: 'Resolved', value: stats.resolved, icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-100' },
-                    { label: 'Departments', value: stats.departments, icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-100' },
+                    { label: 'Closed', value: stats.closed, icon: Zap, color: 'text-gray-600', bg: 'bg-gray-100' },
+                    { label: 'Dumped', value: stats.dumped, icon: Filter, color: 'text-red-600', bg: 'bg-red-100' },
+                    { label: 'Depts', value: stats.departments, icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-100' },
                 ].map(stat => (
-                    <div key={stat.label} className="bg-white rounded-2xl border border-gray-100 p-6 flex items-center justify-between shadow-sm">
-                        <div>
-                            <p className="text-sm font-medium text-gray-500 truncate">{stat.label}</p>
-                            <p className="mt-1 text-3xl font-semibold text-gray-900">{stat.value}</p>
+                    <div key={stat.label} className="bg-white rounded-2xl border border-gray-100 p-5 flex items-center justify-between shadow-sm">
+                        <div className="min-w-0">
+                            <p className="text-xs font-bold text-gray-500 truncate uppercase tracking-tight">{stat.label}</p>
+                            <p className="mt-1 text-2xl font-black text-gray-900">{stat.value}</p>
                         </div>
-                        <div className={`p-3 rounded-xl ${stat.bg}`}>
-                            <stat.icon className={`w-6 h-6 ${stat.color}`} />
+                        <div className={`p-2.5 rounded-xl ${stat.bg} flex-shrink-0`}>
+                            <stat.icon className={`w-5 h-5 ${stat.color}`} />
                         </div>
                     </div>
                 ))}
@@ -184,12 +188,27 @@ export const AdminDashboard = () => {
                     <h3 className="text-lg font-bold text-gray-900 mb-6">By Category</h3>
                     <div className="h-72 w-full">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={categoryData} layout="vertical" margin={{ left: 0, right: 30 }}>
-                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#f0f0f0" />
-                                <XAxis type="number" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: '#94a3b8' }} />
-                                <YAxis dataKey="name" type="category" tick={{ fontSize: 10, fill: '#475569', fontWeight: 500 }} width={120} tickLine={false} axisLine={false} />
-                                <RechartsTooltip cursor={{ fill: '#f1f5f9' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
-                                <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={18}>
+                            <BarChart data={categoryData} margin={{ top: 10, right: 10, left: -20, bottom: 40 }}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                <XAxis 
+                                    dataKey="name" 
+                                    tick={{ fontSize: 10, fill: '#64748b', fontWeight: 600 }} 
+                                    tickLine={false} 
+                                    axisLine={false} 
+                                    interval={0}
+                                    angle={-45}
+                                    textAnchor="end"
+                                />
+                                <YAxis 
+                                    tick={{ fontSize: 10, fill: '#94a3b8' }} 
+                                    tickLine={false} 
+                                    axisLine={false} 
+                                />
+                                <RechartsTooltip 
+                                    cursor={{ fill: '#f8fafc' }} 
+                                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)' }} 
+                                />
+                                <Bar dataKey="value" radius={[6, 6, 0, 0]} barSize={32}>
                                     {categoryData.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                                     ))}

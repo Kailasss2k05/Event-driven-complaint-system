@@ -35,6 +35,8 @@ export const StaffDashboard = () => {
         pending: complaints.filter(c => ['SUBMITTED', 'VALIDATED', 'CATEGORIZED', 'ASSIGNED'].includes(c.status)).length,
         inProgress: complaints.filter(c => c.status === 'IN_PROGRESS').length,
         resolved: complaints.filter(c => c.status === 'RESOLVED').length,
+        closed: complaints.filter(c => c.status === 'CLOSED').length,
+        dumped: complaints.filter(c => c.status === 'DUMPED').length,
     };
 
     const filteredComplaints = complaints.filter(c => {
@@ -59,20 +61,22 @@ export const StaffDashboard = () => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-5">
                 {[
-                    { label: 'Total Complaints', value: stats.total, icon: FileText, color: 'text-blue-600', bg: 'bg-blue-100' },
-                    { label: 'Pending Action', value: stats.pending, icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-100' },
-                    { label: 'In Progress', value: stats.inProgress, icon: Filter, color: 'text-yellow-600', bg: 'bg-yellow-100' },
-                    { label: 'Resolved', value: stats.resolved, icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-100' },
+                    { label: 'Total', value: stats.total, icon: FileText, color: 'text-blue-600', bg: 'bg-blue-200/50' },
+                    { label: 'Pending', value: stats.pending, icon: AlertCircle, color: 'text-orange-600', bg: 'bg-orange-200/50' },
+                    { label: 'Active', value: stats.inProgress, icon: Zap, color: 'text-yellow-600', bg: 'bg-yellow-200/50' },
+                    { label: 'Resolved', value: stats.resolved, icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-200/50' },
+                    { label: 'Closed', value: stats.closed, icon: FileText, color: 'text-gray-600', bg: 'bg-gray-200/50' },
+                    { label: 'Dumped', value: stats.dumped, icon: Filter, color: 'text-red-600', bg: 'bg-red-200/50' },
                 ].map((stat) => (
-                    <div key={stat.label} className="bg-white overflow-hidden shadow-sm rounded-2xl border border-gray-100 p-6 flex items-center justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-gray-500 truncate">{stat.label}</p>
-                            <p className="mt-1 text-3xl font-semibold text-gray-900">{stat.value}</p>
+                    <div key={stat.label} className="bg-white overflow-hidden shadow-sm rounded-2xl border border-gray-100 p-5 flex items-center justify-between">
+                        <div className="min-w-0">
+                            <p className="text-xs font-bold text-gray-400 truncate uppercase tracking-tight">{stat.label}</p>
+                            <p className="mt-1 text-2xl font-black text-gray-900">{stat.value}</p>
                         </div>
-                        <div className={`p-3 rounded-xl ${stat.bg}`}>
-                            <stat.icon className={`w-6 h-6 ${stat.color}`} />
+                        <div className={`p-2.5 rounded-xl ${stat.bg} flex-shrink-0`}>
+                            <stat.icon className={`w-5 h-5 ${stat.color}`} />
                         </div>
                     </div>
                 ))}
@@ -107,6 +111,8 @@ export const StaffDashboard = () => {
                             <option value="ASSIGNED">Assigned</option>
                             <option value="IN_PROGRESS">In Progress</option>
                             <option value="RESOLVED">Resolved</option>
+                            <option value="CLOSED">Closed</option>
+                            <option value="DUMPED">Dumped</option>
                         </select>
                     </div>
                 </div>
