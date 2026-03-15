@@ -8,6 +8,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
 import { Bell, Search, Filter, FileText, AlertCircle, CheckCircle2, TrendingUp, Zap } from 'lucide-react';
 import { useNotificationStore } from '../hooks/useNotifications';
 import { toast } from 'sonner';
+import { cn } from '../utils/cn';
 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#f97316'];
 
@@ -110,6 +111,17 @@ export const AdminDashboard = () => {
             return matchesSearch && matchesDept && matchesStatus && matchesPriority;
         });
     }, [complaints, searchTerm, filterDept, filterStatus, filterPriority]);
+
+    const highPriorityComplaints = useMemo(() => {
+        return complaints.filter(c => 
+            (c.priority === 'HIGH' || c.priority === 'CRITICAL') && 
+            !['RESOLVED', 'CLOSED', 'DUMPED'].includes(c.status)
+        ).sort((a, b) => {
+            if (a.priority === 'CRITICAL' && b.priority !== 'CRITICAL') return -1;
+            if (a.priority !== 'CRITICAL' && b.priority === 'CRITICAL') return 1;
+            return new Date(b.created_at) - new Date(a.created_at);
+        });
+    }, [complaints]);
 
     if (isLoading) return <Loader size="lg" className="h-64" />;
 
@@ -243,6 +255,38 @@ export const AdminDashboard = () => {
                 </div>
             </div>
 
+            {/* High Priority Alerts */}
+            {highPriorityComplaints.length > 0 && (
+                <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                        <AlertCircle className="w-5 h-5 text-red-500" />
+                        <h2 className="text-xl font-bold text-gray-900">High Priority Alerts</h2>
+                        <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs font-bold rounded-full">{highPriorityComplaints.length}</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {highPriorityComplaints.slice(0, 6).map(c => (
+                            <div key={c.complaint_id} className="bg-white p-5 rounded-2xl border-l-4 border-l-red-500 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+                                <div className="flex justify-between items-start mb-3">
+                                    <span className="text-xs font-mono font-bold text-gray-400">#{c.complaint_id.substring(0, 8)}</span>
+                                    <PriorityBadge priority={c.priority} />
+                                </div>
+                                <h4 className="font-bold text-gray-900 line-clamp-1 mb-1">{c.category || 'No Category'}</h4>
+                                <p className="text-sm text-gray-500 line-clamp-2 mb-4">{c.description || 'No description provided.'}</p>
+                                <div className="flex justify-between items-center mt-auto pt-3 border-t border-gray-50">
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] uppercase font-bold text-gray-400">Department</span>
+                                        <span className="text-xs font-semibold text-gray-700">{c.department || 'Unassigned'}</span>
+                                    </div>
+                                    <Link to={`/complaints/${c.complaint_id}`} className="p-2 bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg transition-colors">
+                                        <Zap className="w-4 h-4" />
+                                    </Link>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Department distribution */}
             {deptData.length > 0 && (
                 <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
@@ -305,19 +349,40 @@ export const AdminDashboard = () => {
                                     <td colSpan="7" className="px-6 py-12 text-center text-gray-500">No complaints match your filters.</td>
                                 </tr>
                             ) : (
-                                filteredComplaints.slice(0, 100).map(c => (
-                                    <tr key={c.complaint_id} className="hover:bg-gray-50 transition-colors">
-                                        <td className="px-6 py-4 text-sm font-medium text-gray-900 font-mono">#{c.complaint_id?.substring(0, 8)}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-600">{c.department || '-'}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-600">{c.category || '-'}</td>
-                                        <td className="px-6 py-4"><PriorityBadge priority={c.priority} /></td>
-                                        <td className="px-6 py-4"><ComplaintStatusBadge status={c.status} /></td>
-                                        <td className="px-6 py-4 text-sm text-gray-500">{c.created_at ? format(new Date(c.created_at), 'MMM d, yyyy') : '-'}</td>
-                                        <td className="px-6 py-4 text-right">
-                                            <Link to={`/complaints/${c.complaint_id}`} className="text-primary-600 hover:text-primary-900 text-sm font-semibold transition">View &rarr;</Link>
-                                        </td>
-                                    </tr>
-                                ))
+                                filteredComplaints.slice(0, 100).map(c => {
+                                    const isUrgent = c.priority === 'HIGH' || c.priority === 'CRITICAL';
+                                    const isCritical = c.priority === 'CRITICAL';
+                                    const isNotResolved = !['RESOLVED', 'CLOSED', 'DUMPED'].includes(c.status);
+                                    
+                                    return (
+                                        <tr key={c.complaint_id} className={cn(
+                                            "hover:bg-gray-50 transition-colors",
+                                            isUrgent && isNotResolved && "bg-red-50/30"
+                                        )}>
+                                            <td className="px-6 py-4 text-sm font-medium text-gray-900 font-mono">
+                                                <div className="flex items-center gap-2">
+                                                    {isCritical && isNotResolved && (
+                                                        <span className="flex h-2 w-2 rounded-full bg-red-600 animate-ping"></span>
+                                                    )}
+                                                    #{c.complaint_id?.substring(0, 8)}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-gray-600">{c.department || '-'}</td>
+                                            <td className="px-6 py-4 text-sm text-gray-600">{c.category || '-'}</td>
+                                            <td className="px-6 py-4"><PriorityBadge priority={c.priority} /></td>
+                                            <td className="px-6 py-4"><ComplaintStatusBadge status={c.status} /></td>
+                                            <td className="px-6 py-4 text-sm text-gray-500">{c.created_at ? format(new Date(c.created_at), 'MMM d, yyyy') : '-'}</td>
+                                            <td className="px-6 py-4 text-right">
+                                                <Link to={`/complaints/${c.complaint_id}`} className={cn(
+                                                    "text-sm font-semibold transition",
+                                                    isUrgent && isNotResolved ? "text-red-600 hover:text-red-700 underline underline-offset-4" : "text-primary-600 hover:text-primary-900"
+                                                )}>
+                                                    {isUrgent && isNotResolved ? 'Solve Now →' : 'View →'}
+                                                </Link>
+                                            </td>
+                                        </tr>
+                                    );
+                                })
                             )}
                         </tbody>
                     </table>

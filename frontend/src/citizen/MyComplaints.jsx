@@ -3,23 +3,14 @@ import { Link } from 'react-router-dom';
 import { api, notificationApi } from '../api/api';
 import { Loader } from '../components/Loader';
 import { ComplaintStatusBadge, PriorityBadge } from '../components/Badges';
-import { Calendar, MapPin, Tag, Bell } from 'lucide-react';
+import { Calendar, MapPin, Tag, Bell, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { cn } from '../utils/cn';
 
 export const MyComplaints = () => {
     const [complaints, setComplaints] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-
-    // Notification form
-    const [showNotifForm, setShowNotifForm] = useState(false);
-    const [isSending, setIsSending] = useState(false);
-    const [notifForm, setNotifForm] = useState({
-        recipient_email: '',
-        subject: '',
-        message: '',
-        notification_type: 'SYSTEM'
-    });
 
     useEffect(() => {
         const fetchComplaints = async () => {
@@ -35,21 +26,6 @@ export const MyComplaints = () => {
         fetchComplaints();
     }, []);
 
-    const handleSendNotification = async (e) => {
-        e.preventDefault();
-        setIsSending(true);
-        try {
-            await notificationApi.post('/send-notification', notifForm);
-            toast.success('Notification sent successfully');
-            setNotifForm({ recipient_email: '', subject: '', message: '', notification_type: 'SYSTEM' });
-            setShowNotifForm(false);
-        } catch (error) {
-            toast.error('Failed to send notification');
-        } finally {
-            setIsSending(false);
-        }
-    };
-
     const [filterStatus, setFilterStatus] = useState('ALL');
 
     const stats = {
@@ -64,6 +40,12 @@ export const MyComplaints = () => {
         if (filterStatus === 'ALL') return true;
         if (filterStatus === 'ACTIVE') return !['RESOLVED', 'CLOSED', 'DUMPED'].includes(c.status);
         return c.status === filterStatus;
+    }).sort((a, b) => {
+        if (a.priority === 'CRITICAL' && b.priority !== 'CRITICAL') return -1;
+        if (a.priority !== 'CRITICAL' && b.priority === 'CRITICAL') return 1;
+        if (a.priority === 'HIGH' && b.priority !== 'HIGH' && b.priority !== 'CRITICAL') return -1;
+        if (a.priority !== 'HIGH' && a.priority !== 'CRITICAL' && b.priority === 'HIGH') return 1;
+        return new Date(b.created_at) - new Date(a.created_at);
     });
 
     if (isLoading) return <Loader size="lg" className="h-64" />;
@@ -87,12 +69,6 @@ export const MyComplaints = () => {
                         <option value="CLOSED">Closed</option>
                         <option value="DUMPED">Dumped</option>
                     </select>
-                    <button
-                        onClick={() => setShowNotifForm(!showNotifForm)}
-                        className="px-5 py-2 bg-gray-900 text-white font-bold rounded-xl hover:bg-black hover:scale-105 transition-all shadow-lg flex items-center gap-2"
-                    >
-                        <Bell className="w-4 h-4" /> Send Notification
-                    </button>
                     <Link
                         to="/submit"
                         className="px-5 py-2 bg-primary-600 text-white font-bold rounded-xl hover:bg-primary-700 hover:scale-105 transition-all shadow-lg shadow-primary-200 flex items-center gap-2"
@@ -101,31 +77,6 @@ export const MyComplaints = () => {
                     </Link>
                 </div>
             </div>
-
-            {/* Notification Form Modal */}
-            {showNotifForm && (
-                <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 animate-in fade-in duration-200 mb-8">
-                    <h3 className="text-lg font-bold text-gray-900 mb-4">Manual Notification</h3>
-                    <form onSubmit={handleSendNotification} className="grid sm:grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Recipient Email</label>
-                            <input type="email" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm" value={notifForm.recipient_email} onChange={e => setNotifForm({ ...notifForm, recipient_email: e.target.value })} />
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
-                            <input type="text" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm" value={notifForm.subject} onChange={e => setNotifForm({ ...notifForm, subject: e.target.value })} />
-                        </div>
-                        <div className="sm:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
-                            <textarea required rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm" value={notifForm.message} onChange={e => setNotifForm({ ...notifForm, message: e.target.value })} />
-                        </div>
-                        <div className="sm:col-span-2 flex justify-end gap-3">
-                            <button type="button" onClick={() => setShowNotifForm(false)} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition text-sm font-medium">Cancel</button>
-                            <button type="submit" disabled={isSending} className="px-6 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 disabled:opacity-50 transition text-sm">{isSending ? 'Sending...' : 'Send'}</button>
-                        </div>
-                    </form>
-                </div>
-            )}
 
             {/* Status Summary */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-10">
@@ -163,18 +114,34 @@ export const MyComplaints = () => {
                 </div>
             ) : (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {filteredComplaints.map((complaint) => (
-                        <Link
-                            key={complaint.complaint_id}
-                            to={`/complaints/${complaint.complaint_id}`}
-                            className="group bg-white rounded-2xl border border-gray-100 p-6 shadow-sm hover:shadow-md transition-all duration-200"
-                        >
-                            <div className="flex justify-between items-start mb-4">
-                                <span className="text-xs font-mono text-gray-400 bg-gray-50 px-2 py-1 rounded">
-                                    #{complaint.complaint_id.substring(0, 8)}
-                                </span>
-                                <ComplaintStatusBadge status={complaint.status} />
-                            </div>
+                    {filteredComplaints.map((complaint) => {
+                        const isUrgent = (complaint.priority === 'HIGH' || complaint.priority === 'CRITICAL') && !['RESOLVED', 'CLOSED', 'DUMPED'].includes(complaint.status);
+                        
+                        return (
+                            <Link
+                                key={complaint.complaint_id}
+                                to={`/complaints/${complaint.complaint_id}`}
+                                className={cn(
+                                    "group bg-white rounded-2xl border p-6 shadow-sm hover:shadow-md transition-all duration-200 relative",
+                                    isUrgent ? "border-red-400 bg-red-50/30" : "border-gray-100"
+                                )}
+                            >
+                                {isUrgent && (
+                                    <div className="absolute -top-3 -right-3">
+                                        <span className="flex h-6 w-6 relative">
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-6 w-6 bg-red-500 text-white items-center justify-center">
+                                                <AlertCircle className="w-4 h-4" />
+                                            </span>
+                                        </span>
+                                    </div>
+                                )}
+                                <div className="flex justify-between items-start mb-4">
+                                    <span className={cn("text-xs font-mono px-2 py-1 rounded", isUrgent ? "text-red-700 bg-red-100" : "text-gray-400 bg-gray-50")}>
+                                        #{complaint.complaint_id.substring(0, 8)}
+                                    </span>
+                                    <ComplaintStatusBadge status={complaint.status} />
+                                </div>
 
                             <h3 className="font-semibold text-gray-900 mb-2 line-clamp-1 group-hover:text-primary-600 transition-colors">
                                 {complaint.category || 'Uncategorized'}
@@ -198,7 +165,8 @@ export const MyComplaints = () => {
                                 </div>
                             </div>
                         </Link>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </div>
