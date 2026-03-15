@@ -1,14 +1,25 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../api/api';
+import { api, notificationApi } from '../api/api';
 import { Loader } from '../components/Loader';
 import { ComplaintStatusBadge, PriorityBadge } from '../components/Badges';
-import { Calendar, MapPin, Tag } from 'lucide-react';
+import { Calendar, MapPin, Tag, Bell } from 'lucide-react';
+import { toast } from 'sonner';
 import { format } from 'date-fns';
 
 export const MyComplaints = () => {
     const [complaints, setComplaints] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
+
+    // Notification form
+    const [showNotifForm, setShowNotifForm] = useState(false);
+    const [isSending, setIsSending] = useState(false);
+    const [notifForm, setNotifForm] = useState({
+        recipient_email: '',
+        subject: '',
+        message: '',
+        notification_type: 'SYSTEM'
+    });
 
     useEffect(() => {
         const fetchComplaints = async () => {
@@ -23,6 +34,21 @@ export const MyComplaints = () => {
         };
         fetchComplaints();
     }, []);
+
+    const handleSendNotification = async (e) => {
+        e.preventDefault();
+        setIsSending(true);
+        try {
+            await notificationApi.post('/send-notification', notifForm);
+            toast.success('Notification sent successfully');
+            setNotifForm({ recipient_email: '', subject: '', message: '', notification_type: 'SYSTEM' });
+            setShowNotifForm(false);
+        } catch (error) {
+            toast.error('Failed to send notification');
+        } finally {
+            setIsSending(false);
+        }
+    };
 
     const [filterStatus, setFilterStatus] = useState('ALL');
 
@@ -61,6 +87,12 @@ export const MyComplaints = () => {
                         <option value="CLOSED">Closed</option>
                         <option value="DUMPED">Dumped</option>
                     </select>
+                    <button
+                        onClick={() => setShowNotifForm(!showNotifForm)}
+                        className="px-5 py-2 bg-gray-900 text-white font-bold rounded-xl hover:bg-black hover:scale-105 transition-all shadow-lg flex items-center gap-2"
+                    >
+                        <Bell className="w-4 h-4" /> Send Notification
+                    </button>
                     <Link
                         to="/submit"
                         className="px-5 py-2 bg-primary-600 text-white font-bold rounded-xl hover:bg-primary-700 hover:scale-105 transition-all shadow-lg shadow-primary-200 flex items-center gap-2"
@@ -69,6 +101,31 @@ export const MyComplaints = () => {
                     </Link>
                 </div>
             </div>
+
+            {/* Notification Form Modal */}
+            {showNotifForm && (
+                <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 animate-in fade-in duration-200 mb-8">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4">Manual Notification</h3>
+                    <form onSubmit={handleSendNotification} className="grid sm:grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Recipient Email</label>
+                            <input type="email" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm" value={notifForm.recipient_email} onChange={e => setNotifForm({ ...notifForm, recipient_email: e.target.value })} />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+                            <input type="text" required className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm" value={notifForm.subject} onChange={e => setNotifForm({ ...notifForm, subject: e.target.value })} />
+                        </div>
+                        <div className="sm:col-span-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Message</label>
+                            <textarea required rows={3} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm" value={notifForm.message} onChange={e => setNotifForm({ ...notifForm, message: e.target.value })} />
+                        </div>
+                        <div className="sm:col-span-2 flex justify-end gap-3">
+                            <button type="button" onClick={() => setShowNotifForm(false)} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition text-sm font-medium">Cancel</button>
+                            <button type="submit" disabled={isSending} className="px-6 py-2 bg-primary-600 text-white rounded-lg font-medium hover:bg-primary-700 disabled:opacity-50 transition text-sm">{isSending ? 'Sending...' : 'Send'}</button>
+                        </div>
+                    </form>
+                </div>
+            )}
 
             {/* Status Summary */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-10">

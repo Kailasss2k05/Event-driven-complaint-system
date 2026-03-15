@@ -9,6 +9,7 @@ import { MainLayout } from './layout/MainLayout';
 
 // Auth
 import { Login } from './auth/Login';
+import { Signup } from './auth/Signup';
 
 // Guards
 import { ProtectedRoute, RoleRoute } from './components/ProtectedRoute';
@@ -62,6 +63,7 @@ function App() {
       <Router>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
 
           <Route path="/" element={<Navigate to="/login" replace />} />
 

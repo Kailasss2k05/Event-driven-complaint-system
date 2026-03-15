@@ -7,6 +7,19 @@ export const useAuthStore = create((set, get) => ({
     isAuthenticated: !!localStorage.getItem('token'),
     isLoading: false,
 
+    signup: async (username, email, password) => {
+        set({ isLoading: true });
+        try {
+            await api.post('/auth/signup', { username, email, password, role: 'user' });
+            // Auto login after successful signup
+            const role = await get().login(username, password);
+            return role;
+        } catch (error) {
+            set({ isLoading: false });
+            throw error;
+        }
+    },
+
     login: async (username, password) => {
         set({ isLoading: true });
         try {
