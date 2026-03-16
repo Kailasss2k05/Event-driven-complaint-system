@@ -27,6 +27,7 @@ export const MyComplaints = () => {
     }, []);
 
     const [filterStatus, setFilterStatus] = useState('ALL');
+    const [filterPriority, setFilterPriority] = useState('ALL');
 
     const stats = {
         total: complaints.length,
@@ -37,9 +38,11 @@ export const MyComplaints = () => {
     };
 
     const filteredComplaints = complaints.filter(c => {
-        if (filterStatus === 'ALL') return true;
-        if (filterStatus === 'ACTIVE') return !['RESOLVED', 'CLOSED', 'DUMPED'].includes(c.status);
-        return c.status === filterStatus;
+        const matchesStatus = filterStatus === 'ALL' || 
+                             (filterStatus === 'ACTIVE' ? !['RESOLVED', 'CLOSED', 'DUMPED'].includes(c.status) : c.status === filterStatus);
+        const matchesPriority = filterPriority === 'ALL' || (c.priority || '').toUpperCase() === filterPriority;
+        
+        return matchesStatus && matchesPriority;
     }).sort((a, b) => {
         if (a.priority === 'CRITICAL' && b.priority !== 'CRITICAL') return -1;
         if (a.priority !== 'CRITICAL' && b.priority === 'CRITICAL') return 1;
@@ -68,6 +71,18 @@ export const MyComplaints = () => {
                         <option value="RESOLVED">Resolved</option>
                         <option value="CLOSED">Closed</option>
                         <option value="DUMPED">Dumped</option>
+                    </select>
+                    <select 
+                        title="Filter by priority"
+                        value={filterPriority} 
+                        onChange={(e) => setFilterPriority(e.target.value)}
+                        className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    >
+                        <option value="ALL">All Priorities</option>
+                        <option value="LOW">Low</option>
+                        <option value="MEDIUM">Medium</option>
+                        <option value="HIGH">High</option>
+                        <option value="CRITICAL">Critical</option>
                     </select>
                     <Link
                         to="/submit"

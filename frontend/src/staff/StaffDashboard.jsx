@@ -17,6 +17,7 @@ export const StaffDashboard = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('ALL');
+    const [filterPriority, setFilterPriority] = useState('ALL');
 
     // Notification form
     const [showNotifForm, setShowNotifForm] = useState(false);
@@ -70,15 +71,31 @@ export const StaffDashboard = () => {
         const matchesSearch = c.complaint_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (c.description || '').toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = filterStatus === 'ALL' || c.status === filterStatus;
-        return matchesSearch && matchesStatus;
+        const matchesPriority = filterPriority === 'ALL' || (c.priority || '').toUpperCase() === filterPriority;
+        return matchesSearch && matchesStatus && matchesPriority;
+    }).sort((a, b) => {
+        const aPriority = (a.priority || '').toUpperCase();
+        const bPriority = (b.priority || '').toUpperCase();
+        const isAUrgent = (aPriority === 'CRITICAL' || aPriority === 'HIGH') && !['RESOLVED', 'CLOSED', 'DUMPED'].includes(a.status);
+        const isBUrgent = (bPriority === 'CRITICAL' || bPriority === 'HIGH') && !['RESOLVED', 'CLOSED', 'DUMPED'].includes(b.status);
+        if (isAUrgent && !isBUrgent) return -1;
+        if (!isAUrgent && isBUrgent) return 1;
+        if (isAUrgent && isBUrgent) {
+            if (aPriority === 'CRITICAL' && bPriority !== 'CRITICAL') return -1;
+            if (aPriority !== 'CRITICAL' && bPriority === 'CRITICAL') return 1;
+        }
+        return new Date(b.created_at) - new Date(a.created_at);
     });
 
-    const highPriorityComplaints = complaints.filter(c => 
-        (c.priority === 'HIGH' || c.priority === 'CRITICAL') && 
+    const highPriorityComplaints = complaints.filter(c => {
+        const p = (c.priority || '').toUpperCase();
+        return (p === 'HIGH' || p === 'CRITICAL') && 
         !['RESOLVED', 'CLOSED', 'DUMPED'].includes(c.status)
-    ).sort((a, b) => {
-        if (a.priority === 'CRITICAL' && b.priority !== 'CRITICAL') return -1;
-        if (a.priority !== 'CRITICAL' && b.priority === 'CRITICAL') return 1;
+    }).sort((a, b) => {
+        const aPriority = (a.priority || '').toUpperCase();
+        const bPriority = (b.priority || '').toUpperCase();
+        if (aPriority === 'CRITICAL' && bPriority !== 'CRITICAL') return -1;
+        if (aPriority !== 'CRITICAL' && bPriority === 'CRITICAL') return 1;
         return new Date(b.created_at) - new Date(a.created_at);
     });
 
@@ -164,7 +181,10 @@ export const StaffDashboard = () => {
                             <div key={c.complaint_id} className="bg-white p-5 rounded-2xl border-l-4 border-l-red-500 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
                                 <div className="flex justify-between items-start mb-3">
                                     <span className="text-xs font-mono font-bold text-gray-400">#{c.complaint_id.substring(0, 8)}</span>
-                                    <PriorityBadge priority={c.priority} />
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] uppercase font-black px-1.5 py-0.5 rounded border border-red-500 text-red-600 animate-pulse bg-red-50 shadow-sm shadow-red-100">Emergency</span>
+                                        <PriorityBadge priority={c.priority} />
+                                    </div>
                                 </div>
                                 <h4 className="font-bold text-gray-900 line-clamp-1 mb-1">{c.category || 'No Category'}</h4>
                                 <p className="text-sm text-gray-500 line-clamp-2 mb-4">{c.description || 'No description provided.'}</p>
@@ -215,6 +235,19 @@ export const StaffDashboard = () => {
                             <option value="CLOSED">Closed</option>
                             <option value="DUMPED">Dumped</option>
                         </select>
+                        <Filter className="w-5 h-5 text-gray-400 ml-2" />
+                        <select
+                            title="Filter by priority"
+                            value={filterPriority}
+                            onChange={(e) => setFilterPriority(e.target.value)}
+                            className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-lg"
+                        >
+                            <option value="ALL">All Priorities</option>
+                            <option value="LOW">Low</option>
+                            <option value="MEDIUM">Medium</option>
+                            <option value="HIGH">High</option>
+                            <option value="CRITICAL">Critical</option>
+                        </select>
                     </div>
                 </div>
 
@@ -245,23 +278,28 @@ export const StaffDashboard = () => {
 
                                     return (
                                         <tr key={complaint.complaint_id} className={cn(
-                                            "hover:bg-gray-50 transition-colors",
-                                            isUrgent && isNotResolved && "bg-red-50/30"
+                                            "transition-colors",
+                                            isUrgent && isNotResolved ? "bg-red-100 hover:bg-red-200" : "hover:bg-gray-50"
                                         )}>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="flex items-center gap-2 mb-1">
                                                     {isCritical && isNotResolved && (
                                                         <span className="flex h-2 w-2 rounded-full bg-red-600 animate-ping"></span>
                                                     )}
-                                                    <div className="text-sm font-medium text-gray-900">#{complaint.complaint_id.substring(0, 8)}</div>
+                                                    <div className={cn("text-sm font-medium", isUrgent && isNotResolved ? "text-red-900" : "text-gray-900")}>#{complaint.complaint_id.substring(0, 8)}</div>
                                                 </div>
-                                                <div className="text-xs text-gray-500">{format(new Date(complaint.created_at), 'MMM d, yyyy')}</div>
+                                                <div className={cn("text-xs", isUrgent && isNotResolved ? "text-red-800" : "text-gray-500")}>{format(new Date(complaint.created_at), 'MMM d, yyyy')}</div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <div className="text-sm text-gray-900">{complaint.category || 'N/A'}</div>
+                                                <div className={cn("text-sm font-semibold", isUrgent && isNotResolved ? "text-red-900" : "text-gray-900")}>{complaint.category || 'N/A'}</div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                <PriorityBadge priority={complaint.priority} />
+                                                <div className="flex items-center gap-2">
+                                                    <PriorityBadge priority={complaint.priority} />
+                                                    {isUrgent && isNotResolved && (
+                                                        <span className="text-[10px] uppercase font-black px-1.5 py-0.5 rounded border border-red-500 text-red-600 animate-pulse bg-red-50 shadow-sm shadow-red-100">Emergency</span>
+                                                    )}
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                 <ComplaintStatusBadge status={complaint.status} />
@@ -272,13 +310,13 @@ export const StaffDashboard = () => {
                                                         {complaint.assigned_to}
                                                     </span>
                                                 ) : (
-                                                    <span className="text-gray-400 italic">Unassigned</span>
+                                                    <span className={cn("italic", isUrgent && isNotResolved ? "text-red-500" : "text-gray-400")}>Unassigned</span>
                                                 )}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                 <Link to={`/complaints/${complaint.complaint_id}`} className={cn(
-                                                    "font-semibold transition-colors",
-                                                    isUrgent && isNotResolved ? "text-red-600 hover:text-red-700 underline underline-offset-4" : "text-primary-600 hover:text-primary-900"
+                                                    "font-bold transition-colors",
+                                                    isUrgent && isNotResolved ? "text-red-700 hover:text-red-800 underline underline-offset-4" : "text-primary-600 hover:text-primary-900"
                                                 )}>
                                                     {isUrgent && isNotResolved ? 'Solve Now →' : 'View →'}
                                                 </Link>

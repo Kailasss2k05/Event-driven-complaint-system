@@ -107,18 +107,33 @@ export const AdminDashboard = () => {
                 (c.category || '').toLowerCase().includes(searchTerm.toLowerCase());
             const matchesDept = filterDept === 'ALL' || c.department === filterDept;
             const matchesStatus = filterStatus === 'ALL' || c.status === filterStatus;
-            const matchesPriority = filterPriority === 'ALL' || c.priority === filterPriority;
+            const matchesPriority = filterPriority === 'ALL' || (c.priority || '').toUpperCase() === filterPriority;
             return matchesSearch && matchesDept && matchesStatus && matchesPriority;
+        }).sort((a, b) => {
+            const aPriority = (a.priority || '').toUpperCase();
+            const bPriority = (b.priority || '').toUpperCase();
+            const isAUrgent = (aPriority === 'CRITICAL' || aPriority === 'HIGH') && !['RESOLVED', 'CLOSED', 'DUMPED'].includes(a.status);
+            const isBUrgent = (bPriority === 'CRITICAL' || bPriority === 'HIGH') && !['RESOLVED', 'CLOSED', 'DUMPED'].includes(b.status);
+            if (isAUrgent && !isBUrgent) return -1;
+            if (!isAUrgent && isBUrgent) return 1;
+            if (isAUrgent && isBUrgent) {
+                if (aPriority === 'CRITICAL' && bPriority !== 'CRITICAL') return -1;
+                if (aPriority !== 'CRITICAL' && bPriority === 'CRITICAL') return 1;
+            }
+            return new Date(b.created_at) - new Date(a.created_at);
         });
     }, [complaints, searchTerm, filterDept, filterStatus, filterPriority]);
 
     const highPriorityComplaints = useMemo(() => {
-        return complaints.filter(c => 
-            (c.priority === 'HIGH' || c.priority === 'CRITICAL') && 
+        return complaints.filter(c => {
+            const p = (c.priority || '').toUpperCase();
+            return (p === 'HIGH' || p === 'CRITICAL') && 
             !['RESOLVED', 'CLOSED', 'DUMPED'].includes(c.status)
-        ).sort((a, b) => {
-            if (a.priority === 'CRITICAL' && b.priority !== 'CRITICAL') return -1;
-            if (a.priority !== 'CRITICAL' && b.priority === 'CRITICAL') return 1;
+        }).sort((a, b) => {
+            const aPriority = (a.priority || '').toUpperCase();
+            const bPriority = (b.priority || '').toUpperCase();
+            if (aPriority === 'CRITICAL' && bPriority !== 'CRITICAL') return -1;
+            if (aPriority !== 'CRITICAL' && bPriority === 'CRITICAL') return 1;
             return new Date(b.created_at) - new Date(a.created_at);
         });
     }, [complaints]);
@@ -268,7 +283,10 @@ export const AdminDashboard = () => {
                             <div key={c.complaint_id} className="bg-white p-5 rounded-2xl border-l-4 border-l-red-500 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
                                 <div className="flex justify-between items-start mb-3">
                                     <span className="text-xs font-mono font-bold text-gray-400">#{c.complaint_id.substring(0, 8)}</span>
-                                    <PriorityBadge priority={c.priority} />
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] uppercase font-black px-1.5 py-0.5 rounded border border-red-500 text-red-600 animate-pulse bg-red-50 shadow-sm shadow-red-100">Emergency</span>
+                                        <PriorityBadge priority={c.priority} />
+                                    </div>
                                 </div>
                                 <h4 className="font-bold text-gray-900 line-clamp-1 mb-1">{c.category || 'No Category'}</h4>
                                 <p className="text-sm text-gray-500 line-clamp-2 mb-4">{c.description || 'No description provided.'}</p>
@@ -356,10 +374,10 @@ export const AdminDashboard = () => {
                                     
                                     return (
                                         <tr key={c.complaint_id} className={cn(
-                                            "hover:bg-gray-50 transition-colors",
-                                            isUrgent && isNotResolved && "bg-red-50/30"
+                                            "transition-colors",
+                                            isUrgent && isNotResolved ? "bg-red-100 hover:bg-red-200" : "hover:bg-gray-50"
                                         )}>
-                                            <td className="px-6 py-4 text-sm font-medium text-gray-900 font-mono">
+                                            <td className={cn("px-6 py-4 text-sm font-medium font-mono", isUrgent && isNotResolved ? "text-red-900" : "text-gray-900")}>
                                                 <div className="flex items-center gap-2">
                                                     {isCritical && isNotResolved && (
                                                         <span className="flex h-2 w-2 rounded-full bg-red-600 animate-ping"></span>
@@ -367,15 +385,22 @@ export const AdminDashboard = () => {
                                                     #{c.complaint_id?.substring(0, 8)}
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-sm text-gray-600">{c.department || '-'}</td>
-                                            <td className="px-6 py-4 text-sm text-gray-600">{c.category || '-'}</td>
-                                            <td className="px-6 py-4"><PriorityBadge priority={c.priority} /></td>
+                                            <td className={cn("px-6 py-4 text-sm", isUrgent && isNotResolved ? "text-red-900 font-semibold" : "text-gray-600")}>{c.department || '-'}</td>
+                                            <td className={cn("px-6 py-4 text-sm", isUrgent && isNotResolved ? "text-red-900 font-semibold" : "text-gray-600")}>{c.category || '-'}</td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <PriorityBadge priority={c.priority} />
+                                                    {isUrgent && isNotResolved && (
+                                                        <span className="text-[10px] uppercase font-black px-1.5 py-0.5 rounded border border-red-500 text-red-600 animate-pulse bg-red-50 shadow-sm shadow-red-100">Emergency</span>
+                                                    )}
+                                                </div>
+                                            </td>
                                             <td className="px-6 py-4"><ComplaintStatusBadge status={c.status} /></td>
-                                            <td className="px-6 py-4 text-sm text-gray-500">{c.created_at ? format(new Date(c.created_at), 'MMM d, yyyy') : '-'}</td>
+                                            <td className={cn("px-6 py-4 text-sm", isUrgent && isNotResolved ? "text-red-900 font-medium" : "text-gray-500")}>{c.created_at ? format(new Date(c.created_at), 'MMM d, yyyy') : '-'}</td>
                                             <td className="px-6 py-4 text-right">
                                                 <Link to={`/complaints/${c.complaint_id}`} className={cn(
-                                                    "text-sm font-semibold transition",
-                                                    isUrgent && isNotResolved ? "text-red-600 hover:text-red-700 underline underline-offset-4" : "text-primary-600 hover:text-primary-900"
+                                                    "text-sm font-bold transition",
+                                                    isUrgent && isNotResolved ? "text-red-700 hover:text-red-800 underline underline-offset-4" : "text-primary-600 hover:text-primary-900"
                                                 )}>
                                                     {isUrgent && isNotResolved ? 'Solve Now →' : 'View →'}
                                                 </Link>
