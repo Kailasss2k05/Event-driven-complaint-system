@@ -1,6 +1,7 @@
 import os
 import json
 import base64
+import re
 import logging
 from kafka import KafkaConsumer, KafkaProducer
 from dotenv import load_dotenv
@@ -77,8 +78,9 @@ def detect_profanity(description: str) -> tuple[bool, str]:
     """Check for profanity in complaint description"""
     description_lower = description.lower()
     
+    # Use word boundary matching to avoid false positives like "dead" in "deadline"
     for word in PROFANITY_WORDS:
-        if word in description_lower:
+        if re.search(r'\b' + re.escape(word) + r'\b', description_lower):
             return False, "Complaint contains inappropriate language"
     
     return True, ""

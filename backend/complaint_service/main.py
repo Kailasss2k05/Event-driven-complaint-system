@@ -1,6 +1,7 @@
 import os
 import json
 import base64
+import re
 import httpx
 import cloudinary
 import cloudinary.uploader
@@ -90,12 +91,13 @@ def _run_content_validation(description: str, user_id: int) -> tuple[bool, str]:
     """Run profanity, spam, and duplicate checks. Returns (is_valid, reason)."""
     desc_lower = description.lower()
 
-    # Profanity check
+    # Profanity check (word boundary matching to avoid false positives like "dead" in "deadline")
     for word in PROFANITY_WORDS:
-        if word in desc_lower:
+        # Use word boundaries: \b ensures we match whole words only
+        if re.search(r'\b' + re.escape(word) + r'\b', desc_lower):
             return False, "Complaint contains inappropriate language"
 
-    # Spam pattern check
+    # Spam pattern check (phrase matching for multi-word patterns)
     for pattern in SPAM_PATTERNS:
         if pattern in desc_lower:
             return False, "Complaint flagged as potential spam"
