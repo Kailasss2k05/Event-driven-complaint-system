@@ -291,11 +291,13 @@ async def create_complaint(
 
     category = prediction["category"]
     priority = prediction["priority"]
+    severity = prediction.get("severity")
     department = prediction["department"]
+    eisenhower_quadrant = prediction.get("eisenhower_quadrant")
 
     # Step 6: Update DB with categorization
     try:
-        update_complaint_categorized(complaint_id, category, priority, None, department)
+        update_complaint_categorized(complaint_id, category, priority, severity, department)
     except Exception as e:
         print(f"Warning: Failed to update DB categorization: {e}")
 
@@ -305,7 +307,9 @@ async def create_complaint(
         "description": text,
         "category": category,
         "priority": priority,
+        "severity": severity,
         "department": department,
+        "eisenhower_quadrant": eisenhower_quadrant,
         "status": "CATEGORIZED",
         "timestamp": timestamp
     }
@@ -322,7 +326,9 @@ async def create_complaint(
         "summary": summary,
         "category": category,
         "priority": priority,
-        "department": department
+        "severity": severity,
+        "department": department,
+        "eisenhower_quadrant": eisenhower_quadrant
     }
 
 

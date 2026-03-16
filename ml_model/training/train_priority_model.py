@@ -23,7 +23,7 @@ df = pd.read_csv(DATA_PATH)
 df.columns = df.columns.str.strip()
 
 df = df.dropna(
-    subset=["Complaint_Description", "Priority", "Severity"]
+    subset=["Complaint_Description", "Priority"]
 )
 
 df["Complaint_Description"] = (
@@ -33,11 +33,11 @@ df["Complaint_Description"] = (
     .str.strip()
 )
 
-df["model_text"] = (
-    df["Complaint_Description"] + " " + df["Severity"]
-)
-
-texts = df["model_text"]
+# Priority is learned purely from complaint text.
+# Severity is NOT used as a training input — the Eisenhower
+# overlay applied at inference time handles urgency/importance
+# signals independently from the text itself.
+texts = df["Complaint_Description"]
 labels = df["Priority"]
 
 # 3. Distribution Check

@@ -208,7 +208,7 @@ DEPARTMENT_MAP = {
 }
 
 # ==============================
-# Severity Detection
+# Severity + Eisenhower Priority Detection
 # ==============================
 CRITICAL_WORDS = [
     "fire", "electric", "shock",
@@ -220,6 +220,21 @@ MEDIUM_WORDS = [
     "leakage", "sewage",
     "damaged road", "overflow"
 ]
+
+URGENT_WORDS = [
+    "urgent", "immediately", "immediate", "asap", "right now", "today",
+    "danger", "dangerous", "risk", "emergency", "critical", "blocked"
+]
+
+IMPORTANT_WORDS = [
+    "hospital", "school", "children", "elderly", "public safety",
+    "drinking water", "contamination", "disease", "injury", "accident",
+    "main road", "high traffic", "community"
+]
+
+
+def _has_any_keyword(text_lower: str, keywords: list[str]) -> bool:
+    return any(word in text_lower for word in keywords)
 
 
 def detect_severity(text: str) -> str:
@@ -233,39 +248,85 @@ def detect_severity(text: str) -> str:
     return "Low"
 
 
-def safety_priority_override(text: str, predicted_priority: str) -> str:
+def eisenhower_priority(text: str, severity: str, model_priority: str) -> tuple[str, str]:
+    """
+    Map complaint to an Eisenhower quadrant and existing priority scale.
+
+    Quadrants:
+    - Do First  (Urgent + Important)       -> CRITICAL
+    - Schedule  (Not Urgent + Important)   -> HIGH
+    - Delegate  (Urgent + Not Important)   -> MEDIUM
+    - Eliminate (Not Urgent + Not Important) -> ML model fallback
+
+    Urgency and importance are determined purely by keyword signals and
+    detected severity. The ML model is NOT used to set is_urgent or
+    is_important (doing so caused everything to collapse to CRITICAL
+    because the model returns HIGH for many complaints).
+    The ML model is only used as a tiebreaker in the Eliminate quadrant.
+    """
     text_lower = text.lower()
-    for word in CRITICAL_WORDS:
-        if word in text_lower:
-            return "High"
-    return predicted_priority
+    model_priority_upper = str(model_priority).upper()
+
+    is_urgent = _has_any_keyword(text_lower, URGENT_WORDS)
+    is_important = _has_any_keyword(text_lower, IMPORTANT_WORDS)
+
+    # Detected severity is the strongest signal:
+    # - Critical words (fire, gas leak, collapse, etc.) → urgent AND important
+    # - Medium words (leakage, sewage, overflow, etc.) → urgent only
+    if severity == "Critical":
+        is_urgent = True
+        is_important = True
+    elif severity == "Medium":
+        is_urgent = True
+
+    if is_urgent and is_important:
+        return "DO_FIRST", "CRITICAL"
+    if (not is_urgent) and is_important:
+        return "SCHEDULE", "HIGH"
+    if is_urgent and (not is_important):
+        return "DELEGATE", "MEDIUM"
+
+    # Eliminate quadrant: no strong keyword signals detected.
+    # Fall back to the ML model's own prediction.
+    if model_priority_upper in {"HIGH", "CRITICAL"}:
+        return "ELIMINATE", "HIGH"
+    if model_priority_upper in {"MEDIUM", "NORMAL"}:
+        return "ELIMINATE", "MEDIUM"
+    return "ELIMINATE", "LOW"
 
 
 # ==============================
 # Prediction Function
 # ==============================
 def predict_complaint(text: str):
-    
+
     global models_ready
 
     if not models_ready:
         load_models()
 
-    # Category prediction uses raw text
+    # Category prediction uses raw text.
     emb_category = embedder.encode([text], convert_to_numpy=True)
     category = category_model.predict(emb_category)[0]
 
-    # Priority prediction uses text + severity (matches training data format)
+    # ML model predicts priority from raw complaint text only.
+    # No severity column is needed — the model learned urgency patterns
+    # from complaint text during training.
     severity = detect_severity(text)
-    priority_input = text.lower() + " " + severity
-    emb_priority = embedder.encode([priority_input], convert_to_numpy=True)
-    priority = priority_model.predict(emb_priority)[0]
-    priority = safety_priority_override(text, priority)
+    emb_priority = embedder.encode([text.lower()], convert_to_numpy=True)
+    model_priority = priority_model.predict(emb_priority)[0]
+
+    # Eisenhower overlay uses keyword-detected severity + ML output
+    # to determine the final quadrant and priority label.
+    eisenhower_quadrant, priority = eisenhower_priority(text, severity, model_priority)
 
     department = DEPARTMENT_MAP.get(category, "General Department")
 
     return {
         "category": category,
         "priority": priority,
-        "department": department
+        "severity": severity,
+        "department": department,
+        "eisenhower_quadrant": eisenhower_quadrant,
+        "priority_model_raw": str(model_priority).upper()
     }

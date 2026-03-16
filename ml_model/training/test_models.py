@@ -36,7 +36,7 @@ print("\nModels loaded successfully")
 
 
 # ==============================
-# 3. Severity Auto Detection
+# 3. Severity + Eisenhower Priority Detection
 # ==============================
 
 CRITICAL_WORDS = [
@@ -49,6 +49,21 @@ MEDIUM_WORDS = [
     "leakage", "sewage",
     "damaged road", "overflow"
 ]
+
+URGENT_WORDS = [
+    "urgent", "immediately", "immediate", "asap", "right now", "today",
+    "danger", "dangerous", "risk", "emergency", "critical", "blocked"
+]
+
+IMPORTANT_WORDS = [
+    "hospital", "school", "children", "elderly", "public safety",
+    "drinking water", "contamination", "disease", "injury", "accident",
+    "main road", "high traffic", "community"
+]
+
+
+def has_any_keyword(text, keywords):
+    return any(word in text for word in keywords)
 
 
 def detect_severity(text):
@@ -66,23 +81,37 @@ def detect_severity(text):
     return "Low"
 
 
-# ==============================
-# 4. Safety Override
-# ==============================
-
-def safety_priority_override(text, predicted_priority):
+def eisenhower_priority(text, severity, model_priority):
 
     text = text.lower()
+    model_priority = str(model_priority).upper()
 
-    for word in CRITICAL_WORDS:
-        if word in text:
-            return "High"
+    is_urgent = has_any_keyword(text, URGENT_WORDS)
+    is_important = has_any_keyword(text, IMPORTANT_WORDS)
 
-    return predicted_priority
+    if severity == "Critical":
+        is_urgent = True
+        is_important = True
+    elif severity == "Medium":
+        is_urgent = True
+
+    if is_urgent and is_important:
+        return "DO_FIRST", "CRITICAL"
+    if (not is_urgent) and is_important:
+        return "SCHEDULE", "HIGH"
+    if is_urgent and (not is_important):
+        return "DELEGATE", "MEDIUM"
+
+    # Eliminate quadrant: fall back to ML model.
+    if model_priority in {"HIGH", "CRITICAL"}:
+        return "ELIMINATE", "HIGH"
+    if model_priority in {"MEDIUM", "NORMAL"}:
+        return "ELIMINATE", "MEDIUM"
+    return "ELIMINATE", "LOW"
 
 
 # ==============================
-# 5. Testing Loop
+# 4. Testing Loop
 # ==============================
 
 while True:
@@ -99,14 +128,16 @@ while True:
     # Auto Severity
     severity = detect_severity(text)
 
-    # Priority Prediction
-    priority_input = text.lower() + " " + severity.lower()
-    emb_priority = embedder.encode([priority_input])
+    # Priority Prediction — text only, no severity column needed
+    emb_priority = embedder.encode([text.lower()])
 
-    priority = priority_model.predict(emb_priority)[0]
-    priority = safety_priority_override(text, priority)
+    model_priority = priority_model.predict(emb_priority)[0]
+    quadrant, priority = eisenhower_priority(text, severity, model_priority)
 
     print("\nPrediction Result")
     print("-------------------")
     print("Category :", category)
-    print("Priority :", priority)
+    print("Severity :", severity)
+    print("Quadrant :", quadrant)
+    print("Model Priority :", str(model_priority).upper())
+    print("Final Priority :", priority)
