@@ -18,12 +18,17 @@ CREATE TABLE IF NOT EXISTS users (
     username        VARCHAR(100) UNIQUE NOT NULL,
     email           VARCHAR(255) UNIQUE NOT NULL,
     password_hash   TEXT NOT NULL,
-    role            VARCHAR(50) DEFAULT 'user' CHECK (role IN ('user', 'department_admin', 'super_admin')),
+    role            VARCHAR(50) DEFAULT 'user' CHECK (role IN ('user', 'staff', 'department_admin', 'super_admin')),
     department_name VARCHAR(255) REFERENCES departments(name),
     is_active       BOOLEAN DEFAULT TRUE,
     created_at      TIMESTAMP DEFAULT NOW(),
     updated_at      TIMESTAMP DEFAULT NOW()
 );
+
+-- Migration note for existing DBs:
+-- ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check;
+-- ALTER TABLE users ADD CONSTRAINT users_role_check
+--   CHECK (role IN ('user', 'staff', 'department_admin', 'super_admin'));
 
 -- 3. Categories Table
 CREATE TABLE IF NOT EXISTS categories (

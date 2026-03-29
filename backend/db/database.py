@@ -382,6 +382,96 @@ def get_user_by_id(user_id):
         conn.close()
 
 
+def get_active_user_by_username(username):
+    """Get active user by username."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, username, email, role, department_name, is_active
+                FROM users
+                WHERE username = %s AND is_active = TRUE
+                """,
+                (username,)
+            )
+            return cur.fetchone()
+    finally:
+        conn.close()
+
+
+def get_users_by_role(role):
+    """Get active users by role."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, username, email, role, department_name
+                FROM users
+                WHERE role = %s AND is_active = TRUE
+                ORDER BY username ASC
+                """,
+                (role,)
+            )
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
+def get_users_by_department_and_role(department_name, role):
+    """Get active users by department and role."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, username, email, role, department_name
+                FROM users
+                WHERE role = %s
+                  AND department_name = %s
+                  AND is_active = TRUE
+                ORDER BY username ASC
+                """,
+                (role, department_name)
+            )
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
+def get_staff_workload_by_department(department_name):
+    """Return staff members with active/total assignment counts for a department."""
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT
+                    u.id,
+                    u.username,
+                    u.email,
+                    u.department_name,
+                    COUNT(c.complaint_id) AS total_assigned,
+                    COUNT(c.complaint_id) FILTER (
+                        WHERE c.status IN ('ASSIGNED', 'IN_PROGRESS')
+                    ) AS active_assigned
+                FROM users u
+                LEFT JOIN complaints c
+                    ON c.assigned_to = u.username
+                WHERE u.role = 'staff'
+                  AND u.department_name = %s
+                  AND u.is_active = TRUE
+                GROUP BY u.id, u.username, u.email, u.department_name
+                ORDER BY active_assigned DESC, total_assigned DESC, u.username ASC
+                """,
+                (department_name,)
+            )
+            return cur.fetchall()
+    finally:
+        conn.close()
+
+
 # FastAPI dependency for protected routes
 from fastapi import Depends, HTTPException, status
 from backend.auth.oauth2 import oauth2_scheme
@@ -447,6 +537,13 @@ def can_access_complaint(user, complaint_id):
     if user["role"] == "department_admin" and user["department_name"]:
         complaint = get_complaint_by_id(complaint_id)
         return complaint and complaint["department"] == user["department_name"]
+
+    # Staff can access complaints in their department (primarily assigned to them)
+    if user["role"] == "staff" and user["department_name"]:
+        complaint = get_complaint_by_id(complaint_id)
+        if not complaint:
+            return False
+        return complaint["department"] == user["department_name"]
     
     return False
 
@@ -457,6 +554,9 @@ def get_accessible_complaints(user):
         return get_all_complaints()
     elif user["role"] == "department_admin" and user["department_name"]:
         return get_complaints_by_department(user["department_name"])
+    elif user["role"] == "staff" and user["department_name"]:
+        complaints = get_complaints_by_department(user["department_name"])
+        return [c for c in complaints if c.get("assigned_to") == user.get("username")]
     else:  # regular user
         return get_complaints_by_user(user["id"])
 

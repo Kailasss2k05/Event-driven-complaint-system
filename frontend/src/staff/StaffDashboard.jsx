@@ -14,6 +14,8 @@ export const StaffDashboard = () => {
     const { user } = useAuthStore();
     const { isConnected } = useNotificationStore();
     const [complaints, setComplaints] = useState([]);
+    const [staffWorkload, setStaffWorkload] = useState([]);
+    const [staffFilter, setStaffFilter] = useState('ALL');
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('ALL');
@@ -30,9 +32,12 @@ export const StaffDashboard = () => {
     });
 
     useEffect(() => {
-        const fetchDepartmentComplaints = async () => {
+        const fetchComplaints = async () => {
             try {
-                const res = await api.get('/admin/complaints/department');
+                const endpoint = user?.role === 'staff'
+                    ? '/staff/complaints/me'
+                    : '/admin/complaints/department';
+                const res = await api.get(endpoint);
                 setComplaints(res.data);
             } catch (error) {
                 console.error('Failed to fetch department complaints', error);
@@ -40,8 +45,23 @@ export const StaffDashboard = () => {
                 setIsLoading(false);
             }
         };
-        fetchDepartmentComplaints();
-    }, []);
+        if (user?.role) {
+            fetchComplaints();
+        }
+    }, [user?.role]);
+
+    useEffect(() => {
+        const fetchStaffWorkload = async () => {
+            if (user?.role !== 'department_admin') return;
+            try {
+                const res = await api.get('/admin/staff/workload');
+                setStaffWorkload(res?.data?.staff || []);
+            } catch (error) {
+                console.error('Failed to fetch staff workload', error);
+            }
+        };
+        fetchStaffWorkload();
+    }, [user?.role]);
 
     const handleSendNotification = async (e) => {
         e.preventDefault();
@@ -72,7 +92,8 @@ export const StaffDashboard = () => {
             (c.description || '').toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = filterStatus === 'ALL' || c.status === filterStatus;
         const matchesPriority = filterPriority === 'ALL' || (c.priority || '').toUpperCase() === filterPriority;
-        return matchesSearch && matchesStatus && matchesPriority;
+        const matchesStaff = staffFilter === 'ALL' || (c.assigned_to || '') === staffFilter;
+        return matchesSearch && matchesStatus && matchesPriority && matchesStaff;
     }).sort((a, b) => {
         const aPriority = (a.priority || '').toUpperCase();
         const bPriority = (b.priority || '').toUpperCase();
@@ -106,24 +127,30 @@ export const StaffDashboard = () => {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900">Department Dashboard</h1>
-                    <p className="text-gray-500 mt-2">Manage and resolve complaints assigned to {user?.username}'s department</p>
+                    <p className="text-gray-500 mt-2">
+                        {user?.role === 'staff'
+                            ? 'Manage and resolve complaints assigned to you'
+                            : `Manage and resolve complaints assigned to ${user?.username}'s department`}
+                    </p>
                 </div>
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 px-3 py-1 bg-white border border-gray-100 rounded-full shadow-sm">
                         <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`}></div>
                         <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">{isConnected ? 'Live' : 'Offline'}</span>
                     </div>
-                    <button
-                        onClick={() => setShowNotifForm(!showNotifForm)}
-                        className="px-5 py-2.5 bg-gray-900 text-white font-medium rounded-xl hover:bg-black transition-colors flex items-center gap-2 shadow-lg shadow-gray-200 text-sm"
-                    >
-                        <Bell className="w-4 h-4" /> Send Notification
-                    </button>
+                    {user?.role === 'department_admin' && (
+                        <button
+                            onClick={() => setShowNotifForm(!showNotifForm)}
+                            className="px-5 py-2.5 bg-gray-900 text-white font-medium rounded-xl hover:bg-black transition-colors flex items-center gap-2 shadow-lg shadow-gray-200 text-sm"
+                        >
+                            <Bell className="w-4 h-4" /> Send Notification
+                        </button>
+                    )}
                 </div>
             </div>
 
             {/* Notification Form Modal */}
-            {showNotifForm && (
+            {showNotifForm && user?.role === 'department_admin' && (
                 <div className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200 animate-in fade-in duration-200">
                     <h3 className="text-lg font-bold text-gray-900 mb-4">Manual Notification</h3>
                     <form onSubmit={handleSendNotification} className="grid sm:grid-cols-2 gap-4">
@@ -248,6 +275,24 @@ export const StaffDashboard = () => {
                             <option value="HIGH">High</option>
                             <option value="CRITICAL">Critical</option>
                         </select>
+                        {user?.role === 'department_admin' && (
+                            <>
+                                <Filter className="w-5 h-5 text-gray-400 ml-2" />
+                                <select
+                                    title="Filter by staff"
+                                    value={staffFilter}
+                                    onChange={(e) => setStaffFilter(e.target.value)}
+                                    className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm rounded-lg"
+                                >
+                                    <option value="ALL">All Staff</option>
+                                    {staffWorkload.map((staff) => (
+                                        <option key={staff.id} value={staff.username}>
+                                            {staff.username} ({staff.active_assigned} active)
+                                        </option>
+                                    ))}
+                                </select>
+                            </>
+                        )}
                     </div>
                 </div>
 

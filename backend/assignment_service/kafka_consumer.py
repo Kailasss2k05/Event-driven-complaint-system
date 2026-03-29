@@ -44,13 +44,14 @@ def process_event(event, producer):
     priority = event.get("priority", "Normal")
     category = event.get("category", "Unknown")
 
-    print(f"Complaint {complaint_id} -> Assigned to: {department} "
+    print(f"Complaint {complaint_id} -> Routed to department: {department} "
           f"(Category: {category}, Priority: {priority})")
 
-    # Update database
+    # Update database: move to ASSIGNED stage but keep assigned_to empty
+    # until a department admin assigns a concrete staff user.
     try:
-        update_complaint_assigned(complaint_id, department)
-        print(f"Database updated: complaint {complaint_id} assigned to {department}")
+        update_complaint_assigned(complaint_id, None)
+        print(f"Database updated: complaint {complaint_id} moved to ASSIGNED (staff pending)")
     except Exception as e:
         print(f"Warning: Failed to update DB: {e}")
 
@@ -58,7 +59,7 @@ def process_event(event, producer):
     assigned_event = {
         **event,
         "status": "ASSIGNED",
-        "assigned_to": department
+        "assigned_to": None
     }
 
     producer.send(TOPIC_ASSIGNED, assigned_event)

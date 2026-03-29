@@ -101,7 +101,7 @@ function App() {
           <Route
             path="/staff"
             element={
-              <RoleRoute allowedRoles={['department_admin']}>
+              <RoleRoute allowedRoles={['department_admin', 'staff']}>
                 <SuspenseWrapper><StaffDashboard /></SuspenseWrapper>
               </RoleRoute>
             }

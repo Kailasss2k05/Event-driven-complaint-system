@@ -12,7 +12,11 @@ load_dotenv()
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from backend.db.database import get_user_by_id, get_complaint
+from backend.db.database import (
+    get_user_by_id,
+    get_complaint,
+    get_users_by_department_and_role,
+)
 
 KAFKA_BROKER = os.getenv("KAFKA_BROKER")
 
@@ -312,3 +316,39 @@ async def handle_status_updated(event_data, user, complaint, email_service, webs
         "complaint_id": complaint_id,
         "timestamp": datetime.now().isoformat()
     })
+
+    # Staff follow-up visibility: notify department admins only
+    if event_data.get("updated_by_role") == "staff":
+        updated_by = event_data.get("updated_by_username", "Staff")
+        notes = (event_data.get("notes") or "").strip()
+        department = complaint.get("department")
+
+        department_admins = get_users_by_department_and_role(department, "department_admin") if department else []
+
+        admin_message = (
+            f"Staff {updated_by} updated complaint {complaint_id} to {new_status}."
+            + (f" Notes: {notes}" if notes else "")
+        )
+
+        for admin in department_admins:
+            await websocket_manager.send_notification(admin["id"], {
+                "type": "staff_followup",
+                "message": admin_message,
+                "complaint_id": complaint_id,
+                "status": new_status,
+                "department": department,
+                "updated_by": updated_by,
+                "timestamp": datetime.now().isoformat()
+            })
+
+            notification_store.add_notification(admin["id"], {
+                "type": "staff_followup",
+                "title": f"Staff Follow-up: {new_status}",
+                "message": admin_message,
+                "complaint_id": complaint_id,
+                "timestamp": datetime.now().isoformat(),
+                "metadata": {
+                    "department": department,
+                    "updated_by": updated_by,
+                }
+            })

@@ -15,13 +15,26 @@ export const ComplaintDetail = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isUpdating, setIsUpdating] = useState(false);
     const [updateStatus, setUpdateStatus] = useState('');
-    const [assignee, setAssignee] = useState('');
+    const [selectedStaff, setSelectedStaff] = useState('');
+    const [staffOptions, setStaffOptions] = useState([]);
+    const [followupNotes, setFollowupNotes] = useState('');
+
+    const getValidNextStatuses = (currentStatus) => {
+        const transitions = {
+            ASSIGNED: ['IN_PROGRESS'],
+            IN_PROGRESS: ['RESOLVED', 'DUMPED'],
+            RESOLVED: ['CLOSED'],
+            DUMPED: ['CLOSED'],
+        };
+        return transitions[currentStatus] || [];
+    };
 
     const fetchComplaint = async () => {
         try {
             const res = await api.get(`/complaint/${id}`);
             setComplaint(res.data);
-            setUpdateStatus(res.data.status);
+            const next = getValidNextStatuses(res.data.status);
+            setUpdateStatus(next[0] || '');
         } catch (error) {
             console.error('Failed to fetch complaint detail', error);
             toast.error('Failed to load complaint details');
@@ -34,37 +47,52 @@ export const ComplaintDetail = () => {
         if (id) fetchComplaint();
     }, [id]);
 
+    useEffect(() => {
+        const fetchStaffOptions = async () => {
+            if (user?.role !== 'department_admin') return;
+            try {
+                const res = await api.get('/admin/staff/workload');
+                const list = res?.data?.staff || [];
+                setStaffOptions(list);
+            } catch (error) {
+                console.error('Failed to load department staff', error);
+            }
+        };
+        fetchStaffOptions();
+    }, [user?.role]);
+
     const handleUpdateStatus = async () => {
         if (!updateStatus) return;
         setIsUpdating(true);
         try {
             await api.put(`/complaint/${id}/status`, {
                 status: updateStatus,
-                notes: `Status updated to ${updateStatus}`
+                notes: followupNotes?.trim() || `Status updated to ${updateStatus}`
             });
             toast.success('Status updated');
+            setFollowupNotes('');
             fetchComplaint();
         } catch (error) {
-            toast.error('Failed to update status');
+            toast.error(error?.response?.data?.detail || 'Failed to update status');
         } finally {
             setIsUpdating(false);
         }
     };
 
     const handleAssign = async () => {
-        if (!assignee) return;
+        if (!selectedStaff) return;
         setIsUpdating(true);
         try {
             await api.put(`/admin/complaint/${id}/assign`, {
-                assigned_to: assignee,
+                assigned_to: selectedStaff,
                 target_department: '',
                 notes: 'Assigned via staff dashboard'
             });
             toast.success('Complaint assigned');
             fetchComplaint();
-            setAssignee('');
+            setSelectedStaff('');
         } catch (error) {
-            toast.error('Failed to assign complaint');
+            toast.error(error?.response?.data?.detail || 'Failed to assign complaint');
         } finally {
             setIsUpdating(false);
         }
@@ -80,9 +108,11 @@ export const ComplaintDetail = () => {
         </div>
     );
 
-    const isStaff = user?.role === 'department_admin';
+    const isDepartmentAdmin = user?.role === 'department_admin';
+    const isStaff = user?.role === 'staff';
     const isAdmin = user?.role === 'super_admin';
     const currentStepIndex = VALID_STATUSES.indexOf(complaint.status);
+    const validNextStatuses = getValidNextStatuses(complaint.status);
 
     return (
         <div className="max-w-4xl mx-auto space-y-8 pb-12">
@@ -220,37 +250,61 @@ export const ComplaintDetail = () => {
                                         onChange={(e) => setUpdateStatus(e.target.value)}
                                         className="flex-1 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                                     >
-                                        {['IN_PROGRESS', 'RESOLVED', 'DUMPED', 'CLOSED'].map(s => (
+                                        {validNextStatuses.map(s => (
                                             <option key={s} value={s}>{s.replace('_', ' ')}</option>
                                         ))}
                                     </select>
                                     <button
                                         onClick={handleUpdateStatus}
-                                        disabled={isUpdating || updateStatus === complaint.status}
+                                        disabled={isUpdating || !updateStatus}
                                         className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-50 transition"
                                     >
                                         Save
                                     </button>
                                 </div>
+                                <textarea
+                                    value={followupNotes}
+                                    onChange={(e) => setFollowupNotes(e.target.value)}
+                                    placeholder="Add follow-up details for department admin visibility"
+                                    rows={3}
+                                    className="w-full bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                                />
+                                {validNextStatuses.length === 0 && (
+                                    <p className="text-xs text-gray-500">No further status transitions are allowed from the current status.</p>
+                                )}
                             </div>
-                            <div className="space-y-3 pt-4 border-t border-gray-200">
-                                <label className="block text-sm font-medium text-gray-700">Assign Officer</label>
+                        </div>
+                    )}
+
+                    {isDepartmentAdmin && (
+                        <div className="bg-gradient-to-b from-gray-50 to-white p-6 rounded-2xl shadow-sm border border-gray-200 space-y-6">
+                            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider border-b pb-3">Department Admin Actions</h3>
+                            <div className="space-y-3">
+                                <label className="block text-sm font-medium text-gray-700">Assign Staff</label>
                                 <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={assignee}
-                                        onChange={(e) => setAssignee(e.target.value)}
-                                        placeholder="Officer Name"
+                                    <select
+                                        value={selectedStaff}
+                                        onChange={(e) => setSelectedStaff(e.target.value)}
                                         className="flex-1 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                                    />
+                                    >
+                                        <option value="">Select staff</option>
+                                        {staffOptions.map((staff) => (
+                                            <option key={staff.id} value={staff.username}>
+                                                {staff.username} ({staff.active_assigned} active)
+                                            </option>
+                                        ))}
+                                    </select>
                                     <button
                                         onClick={handleAssign}
-                                        disabled={isUpdating || !assignee.trim()}
+                                        disabled={isUpdating || !selectedStaff}
                                         className="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-medium hover:bg-gray-900 disabled:opacity-50 transition"
                                     >
                                         Assign
                                     </button>
                                 </div>
+                                {staffOptions.length === 0 && (
+                                    <p className="text-xs text-gray-500">No staff found in this department. Create staff users in the database first.</p>
+                                )}
                             </div>
                         </div>
                     )}

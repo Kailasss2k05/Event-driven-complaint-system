@@ -7,7 +7,7 @@ import cloudinary
 import cloudinary.uploader
 from datetime import datetime, timezone
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Query
 from pydantic import BaseModel
 from typing import Optional
 
@@ -32,7 +32,10 @@ from backend.db.database import (
     generate_complaint_id,
     update_complaint_status,
     update_complaint_assigned,
-    update_complaint_rerouted
+    update_complaint_rerouted,
+    get_active_user_by_username,
+    get_staff_workload_by_department,
+    get_users_by_department_and_role,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from backend.auth.router import router as auth_router
@@ -140,7 +143,7 @@ class ComplaintRequest(BaseModel):
 
 
 class ComplaintAssignmentRequest(BaseModel):
-    assigned_to: str = None          # Person/officer being assigned (optional for re-route)
+    assigned_to: str = None          # Staff username being assigned (optional for re-route)
     target_department: str = None    # New department to re-route to (for re-routing only)
     notes: str = None                # Reason for re-routing or assignment notes
 
@@ -148,6 +151,14 @@ class ComplaintAssignmentRequest(BaseModel):
 class ComplaintStatusUpdateRequest(BaseModel):
     status: str  # Status to update to
     notes: str = None  # Optional notes about the status update
+
+
+ALLOWED_STATUS_TRANSITIONS = {
+    "ASSIGNED": {"IN_PROGRESS"},
+    "IN_PROGRESS": {"RESOLVED", "DUMPED"},
+    "RESOLVED": {"CLOSED"},
+    "DUMPED": {"CLOSED"},
+}
 
 
 # ===============================
@@ -392,6 +403,54 @@ async def get_all_complaints_admin(
     return [dict(c) for c in complaints]
 
 
+@app.get("/staff/complaints/me", tags=["Role-Specific Views"])
+async def get_assigned_staff_complaints(
+    staff_user: dict = Depends(require_role("staff"))
+):
+    """Staff view — show only complaints assigned to the current staff user."""
+    if not staff_user.get("department_name"):
+        return []
+    complaints = get_complaints_by_department(staff_user["department_name"])
+    assigned = [dict(c) for c in complaints if c.get("assigned_to") == staff_user.get("username")]
+    return assigned
+
+
+@app.get("/admin/staff/workload", tags=["Role-Specific Views"])
+async def get_department_staff_workload(
+    department: Optional[str] = Query(default=None),
+    admin_user: dict = Depends(require_role("department_admin", "super_admin"))
+):
+    """Get active staff members and their current workload for assignment dropdowns."""
+    target_department = department
+
+    if admin_user["role"] == "department_admin":
+        target_department = admin_user.get("department_name")
+
+    if not target_department:
+        raise HTTPException(status_code=400, detail="Department is required")
+
+    staff_users = get_users_by_department_and_role(target_department, "staff")
+    workload_rows = get_staff_workload_by_department(target_department)
+    workload_map = {row["username"]: row for row in workload_rows}
+
+    staff = []
+    for user in staff_users:
+        counts = workload_map.get(user["username"], {})
+        staff.append({
+            "id": user["id"],
+            "username": user["username"],
+            "email": user["email"],
+            "department_name": user["department_name"],
+            "active_assigned": int(counts.get("active_assigned", 0) or 0),
+            "total_assigned": int(counts.get("total_assigned", 0) or 0),
+        })
+
+    return {
+        "department": target_department,
+        "staff": staff,
+    }
+
+
 # ===============================
 # COMPLAINT STATUS MANAGEMENT
 # ===============================
@@ -461,6 +520,13 @@ async def assign_complaint(
             if not assignment.assigned_to:
                 raise HTTPException(status_code=400, detail="Provide either assigned_to (for assignment) or target_department (for re-routing).")
 
+            staff_user = get_active_user_by_username(assignment.assigned_to)
+            if not staff_user or staff_user.get("role") != "staff":
+                raise HTTPException(status_code=400, detail="Assigned user must be an active staff account.")
+
+            if staff_user.get("department_name") != complaint.get("department"):
+                raise HTTPException(status_code=400, detail="Assigned staff must belong to the same complaint department.")
+
             update_complaint_assigned(complaint_id, assignment.assigned_to)
 
             assignment_event = {
@@ -492,53 +558,82 @@ async def update_complaint_status_endpoint(
     current_user: dict = Depends(get_current_user)
 ):
     """Update complaint status.
-    - Department admin: can update status of complaints in their department.
-    - Assignee (regular user): can update status of complaints assigned to them.
-    - Super admin: view-only — cannot update status.
+    - Staff: can update complaints assigned to them in their own department.
+    - Department admin and super admin: monitor-only (no status transition updates).
     """
     # Check if complaint exists
     complaint = get_complaint(complaint_id)
     if not complaint:
         raise HTTPException(status_code=404, detail="Complaint not found")
 
-    # Only department admins can update complaint status
+    # Super admin remains view-only
     if current_user["role"] == "super_admin":
         raise HTTPException(
             status_code=403,
-            detail="Super admin has view-only access. Only department admins can update complaint status."
+            detail="Super admin has view-only access."
         )
 
-    if current_user["role"] != "department_admin":
+    # Department admin can assign and monitor; staff performs follow-up updates.
+    if current_user["role"] == "department_admin":
         raise HTTPException(
             status_code=403,
-            detail="Only department admins can update complaint status."
+            detail="Department admin can assign and monitor. Assigned staff must update complaint status."
         )
 
-    # Department admin can only update complaints in their own department
+    if current_user["role"] != "staff":
+        raise HTTPException(
+            status_code=403,
+            detail="Only assigned staff can update complaint status."
+        )
+
+    # Staff can only update complaints in their own department
     if current_user["department_name"] != complaint["department"]:
         raise HTTPException(
             status_code=403,
             detail="You can only update complaints belonging to your department."
         )
 
-    # Only actionable statuses are allowed via this endpoint
-    valid_statuses = ["IN_PROGRESS", "RESOLVED", "DUMPED", "CLOSED"]
-    if status_update.status not in valid_statuses:
+    # Staff can only update complaints assigned to them
+    if complaint.get("assigned_to") != current_user.get("username"):
+        raise HTTPException(
+            status_code=403,
+            detail="You can only update complaints assigned to you."
+        )
+
+    current_status = complaint["status"]
+    requested_status = status_update.status
+
+    if requested_status == current_status:
+        return {
+            "message": "No status change applied",
+            "complaint_id": complaint_id,
+            "current_status": current_status
+        }
+
+    allowed_next = ALLOWED_STATUS_TRANSITIONS.get(current_status, set())
+    if requested_status not in allowed_next:
+        allowed_text = ", ".join(sorted(list(allowed_next))) if allowed_next else "none"
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid status. Department admins can set: {', '.join(valid_statuses)}"
+            detail=(
+                f"Invalid status transition from {current_status} to {requested_status}. "
+                f"Allowed next statuses: {allowed_text}."
+            )
         )
     
     try:
         # Update status in database  
-        update_complaint_status(complaint_id, status_update.status)
+        update_complaint_status(complaint_id, requested_status)
         
         # Publish status update event to Kafka
         status_event = {
             "complaint_id": complaint_id,
             "old_status": complaint["status"],
-            "new_status": status_update.status,
+            "new_status": requested_status,
             "updated_by": current_user["id"],
+            "updated_by_username": current_user["username"],
+            "updated_by_role": current_user["role"],
+            "department": complaint.get("department"),
             "notes": status_update.notes,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
@@ -548,7 +643,7 @@ async def update_complaint_status_endpoint(
         return {
             "message": "Complaint status updated successfully",
             "complaint_id": complaint_id,
-            "new_status": status_update.status
+            "new_status": requested_status
         }
         
     except Exception as e:

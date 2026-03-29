@@ -25,6 +25,7 @@ export const Navbar = () => {
     const getDashboardLink = () => {
         switch (user?.role) {
             case 'user': return '/submit';
+            case 'staff': return '/staff';
             case 'department_admin': return '/staff';
             case 'super_admin': return '/admin';
             default: return '/';

@@ -20,6 +20,7 @@ export const Signup = () => {
 
             switch (role) {
                 case 'user': navigate('/my-complaints'); break;
+                case 'staff': navigate('/staff'); break;
                 case 'department_admin': navigate('/staff'); break;
                 case 'super_admin': navigate('/admin'); break;
                 default: navigate('/');
