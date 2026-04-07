@@ -199,11 +199,11 @@ flowchart TD
 ## 🔄 Complaint Lifecycle
 
 ```
-SUBMITTED ──► VALIDATED ──► CATEGORIZED ──► ASSIGNED ──► IN_PROGRESS ──► RESOLVED
-                  │                                                          │
-               REJECTED                                                   CLOSED
-                                                                            │
-                                                                          DUMPED
+SUBMITTED ──► VALIDATED ──► CATEGORIZED ──► ASSIGNED ──► IN_PROGRESS ──► RESOLVED──────────► CLOSED
+                  │                                            |                                ↑
+               REJECTED                                        | ───────►DUMPED ───────────────――
+
+                                                                          
 ```
 
 Each transition emits a Kafka event that triggers downstream services in parallel.
