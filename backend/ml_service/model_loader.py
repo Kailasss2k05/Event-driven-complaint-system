@@ -1,6 +1,8 @@
 import os
 import re
 import joblib
+import threading
+import time
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 
@@ -13,6 +15,7 @@ category_model = None
 priority_model = None
 embedder = None
 models_ready = False
+loading_lock = threading.Lock()
 
 
 # ==============================
@@ -25,7 +28,12 @@ def load_models():
     global embedder
     global models_ready
 
-    print("Loading ML models...")
+    with loading_lock:
+        # Skip if already loaded
+        if models_ready:
+            return
+
+        print("Loading ML models...")
 
     BASE_DIR = os.path.dirname(
         os.path.dirname(
@@ -80,16 +88,33 @@ def load_models():
     with open(embedding_path, "r") as f:
         embedder_name = f.read().strip()
 
-    embedder = SentenceTransformer(
-        embedder_name,
-        device=os.getenv("MODEL_DEVICE")
-    )
+        embedder = SentenceTransformer(
+            embedder_name,
+            device=os.getenv("MODEL_DEVICE", "cpu"),
+            cache_folder="/tmp/sentence_transformers_cache",
+            model_kwargs={'torch_dtype': 'float32'}
+        )
 
-    # Warmup (removes first prediction delay)
-    embedder.encode(["warmup"])
+        models_ready = True
+        print("Models loaded successfully!")
 
-    models_ready = True
-    print("Models loaded successfully!")
+
+def load_models_background():
+    """Load models in a background thread without blocking startup."""
+    thread = threading.Thread(target=load_models, daemon=True)
+    thread.start()
+
+
+def wait_for_models(timeout: int = 120) -> bool:
+    """
+    Wait for models to be loaded. Returns True if ready, False if timeout.
+    Used by prediction endpoints to ensure models are available.
+    """
+    elapsed = 0
+    while not models_ready and elapsed < timeout:
+        time.sleep(0.1)
+        elapsed += 0.1
+    return models_ready
 
 
 # ==============================

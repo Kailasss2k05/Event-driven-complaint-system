@@ -80,7 +80,13 @@ model.fit(X_train_emb, y_train)
 
 y_pred = model.predict(X_test_emb)
 
-print("\nAccuracy:", accuracy_score(y_test, y_pred))
+print("\nEvaluation Results:")
+print("Class Distribution in Test Set:")
+print(y_test.value_counts())
+print("Train Accuracy:", accuracy_score(y_train, model.predict(X_train_emb)))
+print("Test Accuracy:", accuracy_score(y_test, y_pred))
+print("Test Set Size:", len(y_test))
+print("Unique Categories:", len(np.unique(y_test)))
 print("\nClassification Report:\n")
 print(classification_report(y_test, y_pred))
 

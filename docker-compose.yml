@@ -1,5 +1,4 @@
-services:
-
+﻿services:
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: zookeeper
@@ -18,10 +17,8 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-
       KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
   kafka-init:
@@ -33,3 +30,77 @@ services:
       - ./kafka/create-topics.sh:/create-topics.sh
     entrypoint: ["/bin/bash", "/create-topics.sh"]
     restart: "no"
+
+  complaint-service:
+    build: .
+    container_name: complaint-service
+    env_file: .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - kafka
+      - ml-service
+    environment:
+      KAFKA_BROKER: kafka:9092
+      ML_SERVICE_URL: http://ml-service:8001
+    command: ["uvicorn", "backend.complaint_service.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  ml-service:
+    build: .
+    container_name: ml-service
+    env_file: .env
+    ports:
+      - "8001:8001"
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BROKER: kafka:9092
+    volumes:
+      - ./ml_model:/app/ml_model:ro
+      - sentence_transformers_cache:/tmp/sentence_transformers_cache
+    command: ["uvicorn", "backend.ml_service.main:app", "--host", "0.0.0.0", "--port", "8001"]
+
+  notification-service:
+    build: .
+    container_name: notification-service
+    env_file: .env
+    ports:
+      - "8002:8002"
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BROKER: kafka:9092
+    command: ["uvicorn", "backend.notification_service.main:app", "--host", "0.0.0.0", "--port", "8002"]
+
+  validation-service:
+    build: .
+    container_name: validation-service
+    env_file: .env
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BROKER: kafka:9092
+    command: ["python", "backend/validation_service/kafka_consumer.py"]
+
+  assignment-service:
+    build: .
+    container_name: assignment-service
+    env_file: .env
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BROKER: kafka:9092
+    command: ["python", "backend/assignment_service/kafka_consumer.py"]
+
+  audit-service:
+    build: .
+    container_name: audit-service
+    env_file: .env
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BROKER: kafka:9092
+    command: ["python", "backend/audit_service/kafka_consumer.py"]
+
+volumes:
+  sentence_transformers_cache:

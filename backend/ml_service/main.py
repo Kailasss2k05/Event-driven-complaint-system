@@ -11,8 +11,8 @@ from . import model_loader
 # ==============================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
-    model_loader.load_models()
+    # Startup - start loading models in background without blocking
+    model_loader.load_models_background()
     yield
     # Shutdown (cleanup if needed)
 
@@ -53,10 +53,10 @@ def home():
 @app.post("/predict")
 def predict(data: Complaint):
 
-    if not model_loader.models_ready:
+    if not model_loader.wait_for_models():
         raise HTTPException(
             status_code=503,
-            detail="Model loading, try again in a few seconds"
+            detail="Model loading timeout"
         )
 
     try:

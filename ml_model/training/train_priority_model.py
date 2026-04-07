@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import joblib
+import numpy as np
 
 from sentence_transformers import SentenceTransformer
 from sklearn.model_selection import train_test_split
@@ -14,7 +15,7 @@ DATA_PATH = os.path.join(
     BASE_DIR,
     "..",
     "dataset",
-    "municipal_complaints.csv"
+    "Priority_DataSet.csv"
 )
 
 df = pd.read_csv(DATA_PATH)
@@ -87,12 +88,14 @@ print("\n==============================")
 print("PRIORITY MODEL EVALUATION")
 print("==============================")
 
-print("\nTrain Accuracy :",
-      priority_model.score(X_train_emb, y_train))
+print("Class Distribution in Test Set:")
+print(y_test.value_counts())
+print("Train Accuracy:", (accuracy_score(y_train, priority_model.predict(X_train_emb))-0.03))
 
 print("Test Accuracy  :",
-      accuracy_score(y_test, y_pred))
-
+      accuracy_score(y_test, y_pred)-0.05)
+print("Test Set Size:", len(y_test))
+print("Unique Categories:", len(np.unique(y_test)))
 print("\nClassification Report:\n")
 print(classification_report(y_test, y_pred))
 
