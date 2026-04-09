@@ -145,11 +145,11 @@ The **Event-Driven Complaint Management System** is a backend platform for munic
 ## 🔄 Complaint Lifecycle
 
 ```
-SUBMITTED ──► VALIDATED ──► CATEGORIZED ──► ASSIGNED ──► IN_PROGRESS ──► RESOLVED
-                  │                                                          │
-               REJECTED                                                   CLOSED
-                                                                            │
-                                                                          DUMPED
+SUBMITTED ──► VALIDATED ──► CATEGORIZED ──► ASSIGNED ──► IN_PROGRESS ──► RESOLVED──────────► CLOSED
+                  │                                            |                                ↑
+               REJECTED                                        | ───────►DUMPED ───────────────――
+
+                                                                          
 ```
 
 Each transition emits a Kafka event that triggers downstream services in parallel.
