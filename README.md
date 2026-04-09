@@ -46,63 +46,9 @@ The **Event-Driven Complaint Management System** is a backend platform for munic
 
 ## 🏗️ System Architecture
 
-```mermaid
-flowchart TD
-    subgraph FE["  🖥️  Frontend Layer  "]
-        F(["⚛️ React Frontend\nVite · Tailwind CSS"])
-    end
-
-    subgraph API["  ⚙️  API / Service Layer  "]
-        CS["📋 Complaint Service\nFastAPI · :8000"]
-        ML["🤖 ML Service\nFastAPI · :8001"]
-        NS["🔔 Notification Service\nFastAPI + WebSocket · :8002"]
-    end
-
-    subgraph KAFKA["  📨  Messaging Layer  "]
-        K[("🗂️ Apache Kafka\n+ Zookeeper")]
-    end
-
-    subgraph CONSUMERS["  ⚡  Consumer Layer  "]
-        VS["✅ Validation Service"]
-        AS["📌 Assignment Service"]
-        AU["📜 Audit Service"]
-    end
-
-    subgraph DATA["  🗄️  Data Layer  "]
-        DB[("🐘 PostgreSQL\nNeonDB")]
-        EM["📧 Email\nSMTP"]
-    end
-
-    F -->|"REST / HTTP"| CS
-    F <-->|"WebSocket"| NS
-    CS -->|"HTTP sync"| ML
-    ML -.->|"category + priority"| CS
-    CS -->|"publish events"| K
-    K -->|"consume"| VS
-    K -->|"consume"| AS
-    K -->|"consume"| AU
-    K -->|"consume all 5 topics"| NS
-    CS --> DB
-    VS --> DB
-    AS --> DB
-    AU --> DB
-    NS -->|"read"| DB
-    NS --> EM
-
-    classDef frontend fill:#6366f1,stroke:#4f46e5,color:#fff,rx:8
-    classDef service fill:#0891b2,stroke:#0e7490,color:#fff,rx:8
-    classDef kafka fill:#f59e0b,stroke:#d97706,color:#000
-    classDef consumer fill:#10b981,stroke:#059669,color:#fff,rx:8
-    classDef db fill:#8b5cf6,stroke:#7c3aed,color:#fff
-    classDef email fill:#f43f5e,stroke:#e11d48,color:#fff,rx:8
-
-    class F frontend
-    class CS,ML,NS service
-    class K kafka
-    class VS,AS,AU consumer
-    class DB db
-    class EM email
-```
+<p align="center">
+  <img src="diagram.png" width="600"/>
+</p>
 
 ---
 
