@@ -375,6 +375,13 @@ CLOUDINARY_API_SECRET=
 
 ---
 
+## 🧪 Troubleshooting & Notes
+
+- On Windows PowerShell, use `Copy-Item .env.example .env` instead of `copy .env.example .env`.
+- If Kafka consumers fail to connect, make sure ZooKeeper, Kafka, and the `kafka-init` topic setup service are running before starting the backend workers.
+- If the ML service returns a temporary `503`, wait a few moments for the models to finish loading and retry the request.
+- If complaint submission fails on image upload, verify the Cloudinary credentials in `.env` and that the file is under the 5 MB limit.
+
 
 ---
 
