@@ -1,7 +1,18 @@
+import os
 import json
+from dotenv import load_dotenv
 from kafka import KafkaProducer
 
-TOPIC = "complaints_topic"
+load_dotenv()
+
+KAFKA_BROKER = os.getenv("KAFKA_BROKER")
+
+# Pipeline Topics
+TOPIC_SUBMITTED = os.getenv("TOPIC_COMPLAINT_SUBMITTED")
+TOPIC_VALIDATED = os.getenv("TOPIC_COMPLAINT_VALIDATED")
+TOPIC_CATEGORIZED = os.getenv("TOPIC_COMPLAINT_CATEGORIZED")
+TOPIC_ASSIGNED = os.getenv("TOPIC_COMPLAINT_ASSIGNED")
+TOPIC_STATUS_UPDATED = os.getenv("TOPIC_COMPLAINT_STATUS_UPDATED")
 
 producer = None
 
@@ -10,23 +21,55 @@ def get_producer():
     global producer
 
     if producer is None:
-        print("Connecting to Kafka...")
+        print(f"Connecting to Kafka at {KAFKA_BROKER}...")
 
-        producer = KafkaProducer(
-            bootstrap_servers="localhost:9092",
-            value_serializer=lambda v: json.dumps(v).encode("utf-8")
-        )
-
-        print("Kafka producer connected.")
+        try:
+            producer = KafkaProducer(
+                bootstrap_servers=KAFKA_BROKER,
+                value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+                retries=3,
+                request_timeout_ms=10000
+            )
+            print("Kafka producer connected.")
+        except Exception as e:
+            print(f"Failed to connect to Kafka: {e}")
+            raise
 
     return producer
 
 
-def send_complaint_event(event):
+def send_event(topic, event):
+    """Send an event to a specific Kafka topic."""
+    try:
+        producer_instance = get_producer()
+        producer_instance.send(topic, event)
+        producer_instance.flush()
+        print(f"Event sent to topic: {topic}")
+    except Exception as e:
+        print(f"Failed to send event to {topic}: {e}")
+        raise
 
-    producer_instance = get_producer()
 
-    producer_instance.send(TOPIC, event)
-    producer_instance.flush()
+def send_complaint_submitted(event):
+    """Publish when a new complaint is submitted."""
+    send_event(TOPIC_SUBMITTED, event)
 
-    print("Event sent to Kafka.")
+
+def send_complaint_validated(event):
+    """Publish after complaint passes validation."""
+    send_event(TOPIC_VALIDATED, event)
+
+
+def send_complaint_categorized(event):
+    """Publish after ML categorization."""
+    send_event(TOPIC_CATEGORIZED, event)
+
+
+def send_complaint_assigned(event):
+    """Publish when a complaint is assigned."""
+    send_event(TOPIC_ASSIGNED, event)
+
+
+def send_complaint_status_updated(event):
+    """Publish when complaint status changes."""
+    send_event(TOPIC_STATUS_UPDATED, event)

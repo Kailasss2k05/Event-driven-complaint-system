@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CivicResolve Complaint Lifecycle Explorer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f4f7fb;
+  --surface:#ffffff;
+  --surface-soft:#f8fafc;
+  --text:#0f172a;
+  --muted:#475569;
+  --subtle:#64748b;
+  --border:#dbe4ee;
+  --shadow:0 18px 40px rgba(15,23,42,0.08);
+  --brand:#0b6bbf;
+  --brand-soft:#e9f2ff;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#0b1220;
+    --surface:#111b2d;
+    --surface-soft:#0f1a2b;
+    --text:#e2e8f0;
+    --muted:#cbd5e1;
+    --subtle:#94a3b8;
+    --border:#22324a;
+    --shadow:0 24px 48px rgba(0,0,0,0.35);
+    --brand:#38bdf8;
+    --brand-soft:#11283f;
+  }
+}
+body{
+  font-family:"Segoe UI",Tahoma,sans-serif;
+  background:radial-gradient(80rem 28rem at 10% -10%,#dbeafe 0,var(--bg) 50%),var(--bg);
+  color:var(--text);
+  padding:30px 16px;
+}
+.wrap{max-width:1100px;margin:0 auto}
+.hero{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:18px;
+  padding:20px;
+  box-shadow:var(--shadow);
+  margin-bottom:14px;
+}
+.eyebrow{font-size:12px;color:var(--subtle);text-transform:uppercase;letter-spacing:.11em;font-weight:700}
+.title{font-size:30px;line-height:1.15;font-weight:800;margin-top:8px}
+.subtitle{font-size:15px;line-height:1.6;color:var(--muted);margin-top:8px;max-width:70ch}
+.main{
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:18px;
+  padding:20px;
+  box-shadow:var(--shadow);
+}
+.section-label{font-size:12px;color:var(--subtle);text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:10px}
+#timeline{display:flex;align-items:center;gap:8px;margin-bottom:18px;overflow-x:auto;padding-bottom:2px}
+.sb{
+  background:var(--surface-soft);
+  border:1px solid var(--border);
+  border-radius:10px;
+  padding:8px;
+  cursor:pointer;
+  font-size:12px;
+  color:var(--muted);
+  transition:all .15s;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:6px;
+  flex:1;
+  min-width:96px;
+}
+.sb:hover{border-color:#96b8de;color:var(--text)}
+.sb.act{
+  color:var(--text);
+  background:linear-gradient(180deg,var(--brand-soft),var(--surface));
+  border-color:#8db6e2;
+  box-shadow:0 8px 18px rgba(0,0,0,0.08);
+}
+.sdot{width:9px;height:9px;border-radius:50%;background:#b4c2d3;flex-shrink:0}
+.sb.act .sdot{background:var(--stage-color,currentColor)}
+.conn{width:14px;height:2px;background:var(--border);flex-shrink:0}
+.panel{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;min-height:210px}
+.chip{display:inline-block;font-size:11px;padding:4px 9px;border-radius:999px;font-weight:700;white-space:nowrap;border:1px solid transparent}
+.chip-b{background:#e8f3ff;color:#0f4f93;border-color:#bad6f5}
+.chip-p{background:#efeaff;color:#4a2f93;border-color:#c9bbff}
+.chip-a{background:#fff1db;color:#7a4a06;border-color:#f7cf93}
+.chip-g{background:#e6f9ef;color:#0f6e56;border-color:#9be0bf}
+.chip-n{background:var(--surface-soft);color:var(--muted);border-color:var(--border)}
+.chip-r{background:#fde9ec;color:#b42318;border-color:#f8bec8}
+.chip-t{background:#e4f7ef;color:#0f6e56;border-color:#9fe1cb}
+.ai{display:flex;gap:9px;align-items:flex-start;font-size:14px;color:var(--muted);padding:4px 0;line-height:1.55}
+.ai::before{content:">";color:var(--subtle);flex-shrink:0;font-weight:700}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.kcard{background:var(--surface-soft);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+.klabel{font-size:11px;font-weight:700;color:var(--subtle);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px}
+.path-badge{display:inline-flex;align-items:center;gap:7px;font-size:12px;padding:7px 10px;border-radius:999px;color:var(--muted);background:var(--surface-soft);border:1px solid var(--border)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.meta{margin-top:14px}
+code{font-family:Consolas,monospace;font-size:12px}
+@media (max-width:860px){
+  .title{font-size:24px}
+  .row2,.grid2{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">CivicResolve</div>
+    <h1 class="title">Complaint Lifecycle Explorer</h1>
+    <p class="subtitle">Interactive stage-by-stage view of status transitions, responsible services, Kafka topics, and database writes across the complaint pipeline.</p>
+  </div>
+
+  <div class="main">
+    <div class="section-label">Complaint lifecycle pipeline</div>
+    <div id="timeline" aria-label="Lifecycle timeline"></div>
+
+    <div class="panel" id="stage-panel"></div>
+
+    <div class="meta">
+      <div class="section-label">Cross-cutting services (consume all Kafka topics)</div>
+      <div class="grid2">
+        <div class="kcard">
+          <div class="klabel">Notification Service (port 8002)</div>
+          <div style="font-size:13px;color:var(--muted);line-height:1.6">Consumes all 5 topics, sends email via SMTP, and pushes real-time updates over WebSocket <span class="chip chip-t" style="font-size:10px">ws://localhost:8002/ws/{user_id}</span></div>
+        </div>
+        <div class="kcard">
+          <div class="klabel">Audit Service (worker)</div>
+          <div style="font-size:13px;color:var(--muted);line-height:1.6">Consumes all 5 topics and writes every event to <code>complaint_events</code> for an immutable audit trail.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="meta" id="alt-paths" style="margin-top:12px;display:none">
+      <div class="section-label">Alternate path for this stage</div>
+      <div id="alt-paths-content" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const stages=[
+  {
+    id:0,status:'SUBMITTED',short:'Submit',actorLabel:'Citizen',actorChip:'chip-b',
+    serviceLabel:'Complaint Service',servicePort:'8000',serviceChip:'chip-b',
+    pub:'complaint-submitted',con:null,
+    dbOp:'INSERT complaints (status=SUBMITTED)',
+    actions:[
+      'Inline validation: length (10–5000 chars), profanity, spam patterns, duplicate within 12h',
+      'Translation: POST /translate on ML Service (langdetect + GoogleTranslator)',
+      'Summarization: POST /summarize on ML Service (extractive word-frequency scoring)',
+      'Row saved to PostgreSQL — complaint_id format: AA001, AA002, …'
+    ],
+    altPath:null,color:'#185FA5'
+  },
+  {
+    id:1,status:'VALIDATED',short:'Validate',actorLabel:'Complaint Service (inline)',actorChip:'chip-b',
+    serviceLabel:'Complaint Service',servicePort:'8000',serviceChip:'chip-b',
+    pub:'complaint-validated',con:'complaint-submitted',
+    dbOp:'No separate DB change (validation is inline)',
+    actions:[
+      'Publishes validated event with validation_status=PASSED to Kafka',
+      'On failure: DB UPDATE status=REJECTED + rejection_reason stored',
+      'Validation Service (Kafka consumer) also reads complaint-submitted as secondary check',
+      'Event carries full complaint payload forward to next stage'
+    ],
+    altPath:{label:'→ REJECTED',chip:'chip-r',detail:'Validation fails (profanity, spam, duplicate, length)'},color:'#0F6E56'
+  },
+  {
+    id:2,status:'CATEGORIZED',short:'Categorize',actorLabel:'ML Service',actorChip:'chip-p',
+    serviceLabel:'ML Service',servicePort:'8001',serviceChip:'chip-p',
+    pub:'complaint-categorized',con:'complaint-validated',
+    dbOp:'UPDATE: category, priority, severity, department, status=CATEGORIZED',
+    actions:[
+      'SentenceTransformer (all-mpnet-base-v2) encodes complaint text',
+      'LogisticRegression predicts category (20 categories across 3 departments)',
+      'RandomForest predicts raw priority from text embeddings',
+      'Severity detection: keyword scan for CRITICAL / MEDIUM / LOW words',
+      'Eisenhower overlay: urgency × importance → final CRITICAL/HIGH/MEDIUM/LOW',
+      'Department mapped from category via DEPARTMENT_MAP'
+    ],
+    altPath:null,color:'#534AB7'
+  },
+  {
+    id:3,status:'ASSIGNED',short:'Assign',actorLabel:'Assignment Service + Dept Admin',actorChip:'chip-a',
+    serviceLabel:'Assignment Service',servicePort:'worker',serviceChip:'chip-a',
+    pub:'complaint-assigned',con:'complaint-categorized',
+    dbOp:'UPDATE: assigned_to=NULL, status=ASSIGNED (staff TBD by admin)',
+    actions:[
+      'Assignment Service (Kafka consumer) reads complaint-categorized',
+      'Routes to correct department — sets status=ASSIGNED, staff TBD',
+      'Dept admin views workload dashboard → picks staff member',
+      'Admin calls PUT /admin/complaint/{id}/assign with assigned_to username',
+      'Re-routing: dept admin can forward to another department via target_department'
+    ],
+    altPath:null,color:'#BA7517'
+  },
+  {
+    id:4,status:'IN_PROGRESS',short:'In Progress',actorLabel:'Staff Member',actorChip:'chip-g',
+    serviceLabel:'Complaint Service',servicePort:'8000',serviceChip:'chip-b',
+    pub:'complaint-status-updated',con:null,
+    dbOp:'UPDATE: status=IN_PROGRESS',
+    actions:[
+      'Staff calls PUT /complaint/{id}/status with status=IN_PROGRESS',
+      'Role check: only the assigned staff member can update (own complaints only)',
+      'Department check: must belong to complaint\'s department',
+      'Optional notes field → visible to dept admin via staff_followup WebSocket event',
+      'Allowed transition: ASSIGNED → IN_PROGRESS only'
+    ],
+    altPath:null,color:'#3B6D11'
+  },
+  {
+    id:5,status:'RESOLVED',short:'Resolve',actorLabel:'Staff Member',actorChip:'chip-g',
+    serviceLabel:'Complaint Service',servicePort:'8000',serviceChip:'chip-b',
+    pub:'complaint-status-updated',con:null,
+    dbOp:'UPDATE: status=RESOLVED (or DUMPED)',
+    actions:[
+      'Staff marks IN_PROGRESS → RESOLVED (issue fixed) or → DUMPED (cannot process)',
+      'Notification Service sends email "Your complaint has been resolved" to citizen',
+      'Real-time WebSocket push to citizen\'s connected browser tab',
+      'Dept admin receives staff_followup notification if notes were added',
+      'Complaint awaits final admin closure before becoming CLOSED'
+    ],
+    altPath:{label:'or → DUMPED',chip:'chip-a',detail:'Staff cannot process, then admin moves to CLOSED'},color:'#3B6D11'
+  },
+  {
+    id:6,status:'CLOSED',short:'Close',actorLabel:'Dept Admin / Super Admin',actorChip:'chip-t',
+    serviceLabel:'Complaint Service',servicePort:'8000',serviceChip:'chip-b',
+    pub:'complaint-status-updated',con:null,
+    dbOp:'UPDATE: status=CLOSED (terminal)',
+    actions:[
+      'Admin calls PUT /complaint/{id}/status with status=CLOSED',
+      'Allowed transitions: RESOLVED → CLOSED, DUMPED → CLOSED',
+      'Super admin is view-only and department admin performs closure',
+      'Terminal state: no further transitions permitted',
+      'Full audit trail preserved in complaint_events table (UUID primary key)'
+    ],
+    altPath:null,color:'#5F5E5A'
+  }
+];
+
+let active=0;
+
+function render(){
+  const tl=document.getElementById('timeline');
+  tl.innerHTML='';
+  stages.forEach((s,i)=>{
+    const btn=document.createElement('button');
+    btn.className='sb'+(i===active?' act':'');
+    btn.type='button';
+    btn.setAttribute('aria-pressed', i===active ? 'true' : 'false');
+    btn.style.setProperty('--stage-color',s.color);
+    btn.innerHTML=`<span class="sdot"></span><span style="font-size:10px;font-weight:500;text-align:center;line-height:1.3">${s.short}</span>`;
+    btn.onclick=()=>{active=i;render();};
+    tl.appendChild(btn);
+    if(i<stages.length-1){
+      const c=document.createElement('div');c.className='conn';tl.appendChild(c);
+    }
+  });
+
+  const s=stages[active];
+  const panel=document.getElementById('stage-panel');
+  const altPathsSection=document.getElementById('alt-paths');
+  const altPathsContent=document.getElementById('alt-paths-content');
+  panel.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:10px;height:10px;border-radius:50%;background:${s.color};flex-shrink:0"></div>
+        <span style="font-size:18px;font-weight:800;color:var(--text)">${s.status}</span>
+        ${s.altPath?`<span class="chip ${s.altPath.chip}">${s.altPath.label}</span>`:''}
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <span class="chip ${s.actorChip}">👤 ${s.actorLabel}</span>
+        <span class="chip ${s.serviceChip}">${s.serviceLabel}${s.servicePort!=='worker'?` ·:${s.servicePort}`:' · worker'}</span>
+      </div>
+    </div>
+    <div class="row2" style="margin-bottom:1rem">
+      <div class="kcard">
+        <div class="klabel">Kafka topic published</div>
+        <span class="chip chip-a" style="font-size:11px;font-family:Consolas,monospace">${s.pub}</span>
+      </div>
+      <div class="kcard">
+        <div class="klabel">${s.con?'Consumes from':'Database operation'}</div>
+        ${s.con?`<span class="chip chip-n" style="font-size:11px;font-family:Consolas,monospace">${s.con}</span>`:`<span style="font-size:12px;color:var(--muted);font-family:Consolas,monospace">${s.dbOp}</span>`}
+      </div>
+    </div>
+    <div>
+      <div class="klabel" style="margin-bottom:6px">What happens</div>
+      ${s.actions.map(a=>`<div class="ai">${a}</div>`).join('')}
+    </div>
+  `;
+
+  if(s.altPath){
+    altPathsSection.style.display='block';
+    altPathsContent.innerHTML=`
+      <div class="path-badge">
+        <span class="chip ${s.altPath.chip}" style="font-size:10px;padding:2px 8px">${s.altPath.label}</span>
+        ${s.altPath.detail}
+      </div>
+    `;
+  } else {
+    altPathsSection.style.display='none';
+    altPathsContent.innerHTML='';
+  }
+}
+render();
+</script>
+</body>
+</html>

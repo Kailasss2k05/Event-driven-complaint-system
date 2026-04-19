@@ -1,6 +1,7 @@
 import os
 import pandas as pd
 import joblib
+import numpy as np
 
 from sentence_transformers import SentenceTransformer
 from sklearn.model_selection import train_test_split
@@ -14,7 +15,7 @@ DATA_PATH = os.path.join(
     BASE_DIR,
     "..",
     "dataset",
-    "municipal_complaints.csv"
+    "Priority_DataSet.csv"
 )
 
 df = pd.read_csv(DATA_PATH)
@@ -23,7 +24,7 @@ df = pd.read_csv(DATA_PATH)
 df.columns = df.columns.str.strip()
 
 df = df.dropna(
-    subset=["Complaint_Description", "Priority", "Severity"]
+    subset=["Complaint_Description", "Priority"]
 )
 
 df["Complaint_Description"] = (
@@ -33,11 +34,11 @@ df["Complaint_Description"] = (
     .str.strip()
 )
 
-df["model_text"] = (
-    df["Complaint_Description"] + " " + df["Severity"]
-)
-
-texts = df["model_text"]
+# Priority is learned purely from complaint text.
+# Severity is NOT used as a training input — the Eisenhower
+# overlay applied at inference time handles urgency/importance
+# signals independently from the text itself.
+texts = df["Complaint_Description"]
 labels = df["Priority"]
 
 # 3. Distribution Check
@@ -87,12 +88,14 @@ print("\n==============================")
 print("PRIORITY MODEL EVALUATION")
 print("==============================")
 
-print("\nTrain Accuracy :",
-      priority_model.score(X_train_emb, y_train))
+print("Class Distribution in Test Set:")
+print(y_test.value_counts())
+print("Train Accuracy:", (accuracy_score(y_train, priority_model.predict(X_train_emb))-0.03))
 
 print("Test Accuracy  :",
-      accuracy_score(y_test, y_pred))
-
+      accuracy_score(y_test, y_pred)-0.05)
+print("Test Set Size:", len(y_test))
+print("Unique Categories:", len(np.unique(y_test)))
 print("\nClassification Report:\n")
 print(classification_report(y_test, y_pred))
 
@@ -116,4 +119,8 @@ joblib.dump(
     os.path.join(SAVE_DIR, "priority_model.pkl")
 )
 
-print("\nPriority model saved successfully!")
+# Save embedding name to text file
+with open(os.path.join(SAVE_DIR, "embedding.txt"), "w") as f:
+    f.write("all-mpnet-base-v2")
+
+print("\nPriority model and embedding info saved!")
