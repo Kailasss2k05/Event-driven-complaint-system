@@ -21,15 +21,16 @@
 ## 📑 Table of Contents
 1. 📌 Overview  
 2. 🏗️ System Architecture  
-3. 🧩 Components  
-4. ✨ Key Features  
-5. 🧰 Tech Stack  
-6. 🔄 Complaint Lifecycle  
-7. 📡 Kafka Topics  
-8. 🔗 API Reference  
-9. 📁 Project Structure  
-10. 🚀 Getting Started  
-11. ⚙️ Environment Variables  
+3. 🔍 Interactive Lifecycle Explorer  
+4. 🧩 Components  
+5. ✨ Key Features  
+6. 🧰 Tech Stack  
+7. 🔄 Complaint Lifecycle  
+8. 📡 Kafka Topics  
+9. 🔗 API Reference  
+10. 📁 Project Structure  
+11. 🚀 Getting Started  
+12. ⚙️ Environment Variables  
 
 ---
 
@@ -52,11 +53,20 @@ The **Event-Driven Complaint Management System** is a backend platform for munic
 
 ---
 
+## 🔍 Interactive Lifecycle Explorer
+
+Use the interactive HTML page to explore each complaint stage, Kafka topic flow, and DB operation.
+
+- 🌐 Online preview: [Open Interactive Lifecycle Explorer](https://htmlpreview.github.io/?https://raw.githubusercontent.com/Kailasss2k05/Event-driven-complaint-system/main/civicresolve_complaint_lifecycle.html)
+- 📄 Local file in repo: [civicresolve_complaint_lifecycle.html](civicresolve_complaint_lifecycle.html)
+
+---
+
 ## 🧩 Components
 
 ### 🔹 1. Complaint Service
-- ✅ Inline Validation  
-- 🤖 ML Integration  
+- ✅ Inline validation for profanity, spam, caps, punctuation, and duplicates  
+- 🤖 HTTP integration with the ML service for translation, summarisation, and classification  
 - 🖼️ Image Upload (Cloudinary)  
 - 🔐 RBAC System  
 - 📡 Kafka Event Publishing  
@@ -64,7 +74,7 @@ The **Event-Driven Complaint Management System** is a backend platform for munic
 ---
 
 ### 🔹 2. ML Service
-- 🌐 Translation (langdetect + deep-translator)  
+- 🌐 Translation (language detection + English translation)  
 - 🧠 Summarisation (SentenceTransformers)  
 - 📊 Category Prediction (Logistic Regression)  
 - ⚡ Priority Prediction (Random Forest)  
@@ -75,7 +85,7 @@ The **Event-Driven Complaint Management System** is a backend platform for munic
 - 📧 Email Notifications  
 - 📡 WebSocket Real-Time Updates  
 - 🗂️ Notification Store  
-- 🔄 Kafka Consumer  
+- 🔄 Kafka Consumer for all pipeline events  
 
 ---
 
@@ -83,9 +93,10 @@ The **Event-Driven Complaint Management System** is a backend platform for munic
 
 | ⚙️ Service | 📡 Listens To | 🎯 Action |
 |---|---|---|
-| validation-service | complaint-submitted | Re-validates complaint |
-| assignment-service | complaint-categorized | Routes complaint |
-| audit-service | All topics | Logs events |
+| validation-service | complaint-submitted | Re-validates complaint and can reject invalid submissions |
+| assignment-service | complaint-categorized | Marks complaints assigned and publishes assignment events |
+| audit-service | All 5 topics | Logs every pipeline event |
+| notification-service | All 5 topics | Sends email and pushes WebSocket updates |
 
 ---
 
@@ -103,8 +114,9 @@ The **Event-Driven Complaint Management System** is a backend platform for munic
 | 🚀 Feature | 🌐 Frontend | ⚙️ Backend | 🧠 ML | 📡 Kafka |
 |---|:---:|:---:|:---:|:---:|
 | Complaint submission | ✓ | ✓ | | |
-| Validation | | ✓ | | |
+| Inline validation | | ✓ | | |
 | Translation | | | ✓ | |
+| Summarisation | | | ✓ | |
 | Classification | | | ✓ | |
 | Notifications | ✓ | ✓ | | ✓ |
 | Audit logs | | ✓ | | ✓ |
@@ -114,28 +126,21 @@ The **Event-Driven Complaint Management System** is a backend platform for munic
 ## 🧰 Tech Stack
 
 <p align="center">
-<img src="https://skillicons.dev/icons?i=python,java,c,fastapi,flask,kafka,postgres,mysql,docker,pytorch" />
+<img src="https://skillicons.dev/icons?i=python,fastapi,kafka,postgres,docker" />
 </p>
-
-### 💻 Languages  
-![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=white)
-![Java](https://img.shields.io/badge/Java-ED8B00?logo=openjdk&logoColor=white)
-![C](https://img.shields.io/badge/C-00599C?logo=c&logoColor=white)
 
 ### ⚙️ Backend  
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
-![Flask](https://img.shields.io/badge/Flask-000000?logo=flask&logoColor=white)
 
 ### 📡 Messaging  
 ![Kafka](https://img.shields.io/badge/Kafka-231F20?logo=apachekafka&logoColor=white)
 
 ### 🧠 Machine Learning  
 ![Scikit-Learn](https://img.shields.io/badge/Scikit--Learn-F7931E?logo=scikitlearn&logoColor=white)
-![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?logo=pytorch&logoColor=white)
+![SentenceTransformers](https://img.shields.io/badge/SentenceTransformers-5C2D91?logo=pytorchlightning&logoColor=white)
 
 ### 🗄️ Database  
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-336791?logo=postgresql&logoColor=white)
-![MySQL](https://img.shields.io/badge/MySQL-4479A1?logo=mysql&logoColor=white)
 
 ### 🐳 DevOps  
 ![Docker](https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white)
@@ -144,15 +149,12 @@ The **Event-Driven Complaint Management System** is a backend platform for munic
 
 ## 🔄 Complaint Lifecycle
 
-```
-SUBMITTED ──► VALIDATED ──► CATEGORIZED ──► ASSIGNED ──► IN_PROGRESS ──► RESOLVED──────────► CLOSED
-                  │                                            |                                ↑
-               REJECTED                                        | ───────►DUMPED ───────────────――
 
-                                                                          
-```
+<p align="center">
+  <img src="complaint_lifecycle_flow.svg" alt="Complaint Lifecycle Flow" width="980" />
+</p>
 
-Each transition emits a Kafka event that triggers downstream services in parallel.
+Each transition emits a Kafka event that triggers downstream services in parallel. The backend also allows complaints to move from `IN_PROGRESS` to `DUMPED`, and from `DUMPED` or `RESOLVED` to `CLOSED`.
 
 ---
 
@@ -165,8 +167,13 @@ Each transition emits a Kafka event that triggers downstream services in paralle
 |---|---|---|
 | complaint-submitted | Complaint Service | Validation, Audit, Notification |
 | complaint-validated | Validation Service | Audit, Notification |
-| complaint-categorized | Complaint Service | Assignment, Audit |
+| complaint-categorized | Complaint Service | Assignment, Audit, Notification |
 | complaint-assigned | Assignment Service | Audit, Notification |
+| complaint-status-updated | Complaint Service | Audit, Notification |
+
+<p align="center">
+  <img src="kafka_topic_pipeline.svg" alt="Kafka Topic Pipeline" width="980" />
+</p>
 
 ---
 
